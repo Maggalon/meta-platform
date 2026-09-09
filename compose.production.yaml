@@ -1,0 +1,78 @@
+name: ${COMPOSE_PROJECT_NAME:-meta-education-production}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-meta_education}
+      POSTGRES_DB: ${POSTGRES_DB:-meta_education}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    image: ${APP_IMAGE:?Set APP_IMAGE to the published image digest}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${APP_PORT:-33000}:3000"
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      DEMO_MODE: "false"
+      APP_URL: https://${DOMAIN:?Set DOMAIN in .env.production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-meta_education}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/${POSTGRES_DB:-meta_education}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env.production}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env.production}
+      ADMIN_NAME: ${ADMIN_NAME:-Преподаватель}
+      S3_ENDPOINT: https://storage.yandexcloud.net
+      S3_REGION: ru-central1
+      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET in .env.production}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env.production}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env.production}
+      S3_FORCE_PATH_STYLE: "false"
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - web
+      - database
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  web:
+  database:
+    internal: true
+
+volumes:
+  postgres-data:

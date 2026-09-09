@@ -1,0 +1,31 @@
+name: ${COMPOSE_PROJECT_NAME:-meta-education-local}
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-meta_education}
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:-meta-education-local-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-meta_education}
+    ports:
+      - "127.0.0.1:35432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  storage:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${LOCAL_MINIO_USER:-meta-education-local}
+      MINIO_ROOT_PASSWORD: ${LOCAL_MINIO_PASSWORD:-meta-education-local-dev-storage}
+    ports:
+      - "127.0.0.1:39000:9000"
+      - "127.0.0.1:39001:9001"
+    volumes:
+      - storage-data:/data
+volumes:
+  postgres-data:
+  storage-data:

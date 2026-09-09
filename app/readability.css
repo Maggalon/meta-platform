@@ -1,0 +1,747 @@
+/* Calibrated type sizes keep supporting information readable on real laptops. */
+.sidebar {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #516644 transparent;
+}
+.nav-item {
+  font-size: 12px;
+}
+.brand-caption {
+  font-size: 9px;
+}
+.topbar-left {
+  font-size: 11px;
+}
+.global-search input {
+  font-size: 11px;
+}
+.global-search kbd {
+  font-size: 10px;
+}
+.page-heading > div > p {
+  font-size: 12px;
+}
+.button {
+  font-size: 12px;
+}
+.stat-top > span:first-child {
+  font-size: 12px;
+}
+.stat-hint {
+  font-size: 10px;
+  color: #8b9580;
+  white-space: normal;
+  line-height: 1.55;
+  min-height: 16px;
+}
+.stat-value {
+  font-size: 35px;
+}
+.focus-copy p {
+  font-size: 11px;
+  color: #c0cfb1;
+}
+.focus-copy button {
+  font-size: 11px;
+}
+.focus-eyebrow {
+  font-size: 8px;
+}
+.next-heading .eyebrow {
+  font-size: 8px;
+}
+.next-time > span {
+  font-size: 11px;
+}
+.next-lesson h3 {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.next-lesson > p {
+  font-size: 11px;
+}
+.next-lesson > p > span {
+  color: #7f8f6e;
+}
+.panel-heading h2 {
+  font-size: 15px;
+}
+.panel-heading p {
+  font-size: 11px;
+  color: #8b967e;
+}
+.small-select {
+  font-size: 10px;
+}
+.chart-summary > small {
+  font-size: 10px;
+}
+.chart-legend {
+  font-size: 10px;
+  color: #89977a;
+}
+.chart-y {
+  font-size: 9px;
+}
+.trend {
+  font-size: 10px;
+}
+.review-preview-row strong {
+  font-size: 12px;
+}
+.review-preview-row p {
+  font-size: 11px;
+  max-width: 200px;
+}
+.review-preview-row small {
+  font-size: 9px;
+  color: #9ba68e;
+}
+.panel-footer-button {
+  font-size: 11px;
+}
+.count-badge {
+  font-size: 10px;
+}
+.assignment-name strong {
+  font-size: 11px;
+}
+.assignment-name small {
+  font-size: 9px;
+  color: #929f81;
+}
+.assignment-table th {
+  font-size: 10px;
+}
+.assignment-table td:nth-child(2) {
+  font-size: 11px;
+}
+.assignment-table td > small {
+  font-size: 9px;
+}
+.mini-progress > span {
+  font-size: 10px;
+}
+.text-button {
+  font-size: 11px;
+}
+.week-strip button {
+  font-size: 10px;
+}
+.week-strip strong {
+  font-size: 12px;
+}
+.daily-lesson h4 {
+  font-size: 10px;
+}
+.daily-lesson p {
+  font-size: 9px;
+}
+.daily-lesson > span {
+  font-size: 10px;
+}
+.workspace-footer {
+  font-size: 9px;
+}
+.filter-tabs > button {
+  font-size: 12px;
+}
+.filter-controls select {
+  font-size: 11px;
+}
+.status {
+  font-size: 10px;
+}
+.full-table th {
+  font-size: 11px;
+}
+.full-table td {
+  font-size: 12px;
+}
+.person-cell strong {
+  font-size: 12px;
+}
+.person-cell small {
+  font-size: 10px;
+}
+.table-title {
+  font-size: 12px !important;
+}
+.group-tag {
+  font-size: 10px;
+}
+.view-note {
+  font-size: 11px;
+}
+.gradebook th > button {
+  font-size: 11px;
+}
+.gradebook th > button > small {
+  font-size: 10px;
+}
+.grade-cell.overdue,
+.grade-cell.new {
+  font-size: 10px;
+}
+.grade-cell {
+  font-size: 13px;
+}
+.grade-legend > span {
+  font-size: 11px;
+}
+.schedule-day header span {
+  font-size: 10px;
+}
+.lesson-time {
+  font-size: 10px;
+}
+.lesson-card h3 {
+  font-size: 12px;
+}
+.lesson-card p {
+  font-size: 10px;
+}
+.lesson-card > div,
+.lesson-card > small {
+  font-size: 9px;
+}
+.lesson-location {
+  font-size: 10px;
+}
+.standard-form label,
+.field-group > label {
+  font-size: 12px;
+}
+.standard-form input,
+.standard-form textarea,
+.standard-form select {
+  font-size: 13px;
+}
+.upload-zone strong {
+  font-size: 11px;
+}
+.upload-zone span {
+  font-size: 10px;
+}
+.student-option {
+  font-size: 11px;
+}
+.form-actions > span {
+  font-size: 10px;
+}
+.review-feedback-form .upload-zone strong {
+  font-size: 10px;
+}
+.review-feedback-form .centered {
+  font-size: 10px;
+}
+.sidebar-profile strong {
+  font-size: 11px;
+}
+.sidebar-profile small {
+  font-size: 10px;
+}
+.nav-label {
+  font-size: 9px;
+}
+.workspace-switch strong {
+  font-size: 12px;
+}
+.workspace-switch small {
+  font-size: 10px;
+}
+.eyebrow {
+  font-size: 9px;
+}
+@media (max-height: 900px) {
+  .sidebar-note {
+    display: none;
+  }
+  .sidebar-bottom {
+    padding-top: 16px;
+  }
+  .brand-caption {
+    margin-bottom: 24px;
+  }
+  .workspace-switch {
+    margin-bottom: 23px;
+  }
+  .sidebar-profile {
+    padding-top: 15px;
+    padding-bottom: 15px;
+    margin-top: 10px;
+  }
+  .nav-item {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    min-height: 40px;
+  }
+  .sidebar {
+    padding-top: 27px;
+  }
+  .sidebar nav {
+    gap: 4px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1190px) {
+  .nav-item {
+    font-size: 11px;
+  }
+  .workspace-switch strong {
+    font-size: 11px;
+  }
+  .workspace-switch small {
+    font-size: 8px;
+  }
+  .sidebar-profile strong {
+    font-size: 10px;
+  }
+  .stat-top > span:first-child {
+    font-size: 10px;
+  }
+  .stat-hint {
+    font-size: 9px;
+  }
+  .stat-value {
+    font-size: 31px;
+  }
+  .panel-heading h2 {
+    font-size: 12px;
+  }
+  .panel-heading p {
+    font-size: 9px;
+  }
+  .focus-copy p {
+    font-size: 9px;
+  }
+  .focus-copy button {
+    font-size: 10px;
+  }
+  .next-lesson h3 {
+    font-size: 12px;
+  }
+  .next-lesson > p {
+    font-size: 9px;
+  }
+  .next-time > span {
+    font-size: 9px;
+  }
+  .next-heading .eyebrow {
+    font-size: 7px;
+  }
+  .focus-eyebrow {
+    font-size: 7px;
+  }
+  .review-preview-row strong {
+    font-size: 10px;
+  }
+  .review-preview-row p {
+    font-size: 9px;
+    max-width: 145px;
+  }
+  .review-preview-row small {
+    font-size: 8px;
+  }
+  .small-select {
+    font-size: 9px;
+  }
+  .chart-legend {
+    font-size: 8px;
+  }
+  .chart-summary > small {
+    font-size: 8px;
+  }
+  .chart-y {
+    font-size: 7px;
+  }
+  .assignment-name strong {
+    font-size: 10px;
+  }
+  .assignment-name small {
+    font-size: 8px;
+  }
+  .assignment-table {
+    min-width: 460px;
+  }
+  .assignment-table th {
+    font-size: 9px;
+  }
+  .assignment-table td:nth-child(2) {
+    font-size: 10px;
+  }
+  .daily-lesson h4 {
+    font-size: 9px;
+  }
+  .daily-lesson p {
+    font-size: 8px;
+  }
+  .daily-lesson > span {
+    font-size: 9px;
+  }
+  .week-strip button {
+    font-size: 9px;
+  }
+  .week-strip strong {
+    font-size: 11px;
+  }
+  .panel-footer-button {
+    font-size: 10px;
+  }
+  .global-search input {
+    font-size: 10px;
+  }
+  .topbar-left {
+    font-size: 10px;
+  }
+  .workspace-footer {
+    font-size: 8px;
+  }
+}
+@media (max-width: 980px) and (min-width: 761px) {
+  .nav-item {
+    font-size: 10px;
+  }
+  .workspace-switch small {
+    font-size: 7px;
+  }
+  .workspace-switch strong {
+    font-size: 10px;
+  }
+  .sidebar-profile strong {
+    font-size: 9px;
+  }
+  .sidebar-profile small {
+    font-size: 8px;
+  }
+  .stat-top > span:first-child {
+    font-size: 9px;
+  }
+  .stat-hint {
+    font-size: 8px;
+  }
+  .focus-copy p {
+    font-size: 8px;
+  }
+  .next-lesson h3 {
+    font-size: 11px;
+  }
+  .next-lesson > p {
+    font-size: 8px;
+  }
+  .page-heading > div > p {
+    font-size: 10px;
+  }
+  .panel-heading h2 {
+    font-size: 11px;
+  }
+  .button {
+    font-size: 10px;
+  }
+  .review-preview-row strong {
+    font-size: 9px;
+  }
+  .review-preview-row p {
+    font-size: 8px;
+    max-width: 130px;
+  }
+  .review-preview-row small {
+    font-size: 7px;
+  }
+  .week-strip button {
+    font-size: 8px;
+  }
+  .daily-lesson h4 {
+    font-size: 8px;
+  }
+  .daily-lesson p {
+    font-size: 7px;
+  }
+  .daily-lesson > span {
+    font-size: 8px;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar {
+    visibility: hidden;
+  }
+  .sidebar.open {
+    visibility: visible;
+  }
+  .nav-item {
+    font-size: 12px;
+  }
+  .workspace-switch strong {
+    font-size: 12px;
+  }
+  .workspace-switch small {
+    font-size: 10px;
+  }
+  .sidebar-profile strong {
+    font-size: 11px;
+  }
+  .sidebar-profile small {
+    font-size: 10px;
+  }
+  .global-search input {
+    font-size: 10px;
+  }
+  .topbar-left {
+    font-size: 10px;
+  }
+  .stat-top > span:first-child {
+    font-size: 10px;
+  }
+  .stat-hint {
+    font-size: 9px;
+  }
+  .panel-heading h2 {
+    font-size: 13px;
+  }
+  .panel-heading p {
+    font-size: 10px;
+  }
+  .focus-copy p {
+    font-size: 10px;
+  }
+  .next-lesson h3 {
+    font-size: 12px;
+  }
+  .next-lesson > p {
+    font-size: 10px;
+  }
+  .review-preview-row strong {
+    font-size: 10px;
+  }
+  .review-preview-row p {
+    font-size: 9px;
+    max-width: 145px;
+  }
+  .review-preview-row small {
+    font-size: 8px;
+  }
+  .week-strip button {
+    font-size: 9px;
+  }
+  .daily-lesson h4 {
+    font-size: 9px;
+  }
+  .daily-lesson p {
+    font-size: 8px;
+  }
+  .daily-lesson > span {
+    font-size: 9px;
+  }
+  .assignment-table {
+    min-width: 490px;
+  }
+  .button {
+    font-size: 11px;
+  }
+  .page-heading > div > p {
+    font-size: 11px;
+  }
+  .focus-eyebrow {
+    font-size: 7px;
+  }
+  .next-heading .eyebrow {
+    font-size: 7px;
+  }
+}
+@media (max-width: 600px) {
+  .page-heading > div > p {
+    font-size: 11px;
+  }
+  .stat-top > span:first-child {
+    font-size: 11px;
+  }
+  .stat-hint {
+    font-size: 9px;
+    min-height: 28px;
+  }
+  .stat-value {
+    font-size: 34px;
+  }
+  .focus-copy p {
+    font-size: 10px;
+    white-space: normal;
+    max-width: 235px;
+    line-height: 1.7;
+  }
+  .focus-copy button {
+    font-size: 11px;
+  }
+  .focus-eyebrow {
+    font-size: 8px;
+  }
+  .focus-card {
+    min-height: 250px;
+  }
+  .focus-copy h2 {
+    font-size: 30px;
+  }
+  .orbit-art {
+    opacity: 0.65;
+    right: -42px;
+  }
+  .next-heading .eyebrow {
+    font-size: 9px;
+  }
+  .next-lesson h3 {
+    font-size: 14px;
+  }
+  .next-lesson > p {
+    font-size: 11px;
+  }
+  .next-time > span {
+    font-size: 11px;
+  }
+  .panel-heading h2 {
+    font-size: 15px;
+  }
+  .panel-heading p {
+    font-size: 11px;
+  }
+  .review-preview-row strong {
+    font-size: 13px;
+  }
+  .review-preview-row p {
+    font-size: 11px;
+    max-width: 240px;
+  }
+  .review-preview-row small {
+    font-size: 9px;
+  }
+  .chart-summary > small {
+    font-size: 9px;
+  }
+  .chart-legend {
+    font-size: 9px;
+  }
+  .chart-y {
+    font-size: 8px;
+  }
+  .panel-footer-button {
+    font-size: 12px;
+  }
+  .small-select {
+    font-size: 10px;
+  }
+  .week-strip button {
+    font-size: 11px;
+  }
+  .week-strip strong {
+    font-size: 13px;
+  }
+  .daily-lesson h4 {
+    font-size: 12px;
+  }
+  .daily-lesson p {
+    font-size: 10px;
+  }
+  .daily-lesson > span {
+    font-size: 11px;
+  }
+  .workspace-footer {
+    font-size: 8px;
+  }
+  .filter-tabs > button {
+    font-size: 10px;
+  }
+  .filter-controls select {
+    font-size: 11px;
+  }
+  .full-table td {
+    font-size: 12px;
+  }
+  .view-note {
+    font-size: 10px;
+  }
+  .standard-form input,
+  .standard-form textarea,
+  .standard-form select {
+    font-size: 16px;
+  }
+  .student-option {
+    font-size: 12px;
+  }
+  .assignment-student-row > strong {
+    font-size: 11px;
+  }
+  .assignment-student-row .status {
+    font-size: 8px;
+  }
+  .form-actions > span {
+    font-size: 10px;
+  }
+  .review-feedback-form .upload-zone strong {
+    font-size: 11px;
+  }
+  .review-feedback-form .centered {
+    font-size: 10px;
+  }
+  .schedule-day header span {
+    font-size: 10px;
+  }
+  .schedule-day header strong {
+    font-size: 23px;
+  }
+  .lesson-card h3 {
+    font-size: 13px;
+  }
+  .lesson-time {
+    font-size: 11px;
+  }
+  .lesson-card p {
+    font-size: 11px;
+  }
+  .lesson-card > div,
+  .lesson-card > small {
+    font-size: 10px;
+  }
+  .table-title {
+    font-size: 12px !important;
+  }
+  .global-search input {
+    font-size: 10px;
+  }
+  .notifications-panel strong {
+    font-size: 12px;
+  }
+  .notifications-panel small {
+    font-size: 11px;
+  }
+  .modal .status {
+    font-size: 9px;
+  }
+  .assignment-table .assignment-name {
+    min-width: 220px;
+  }
+}
+@media (max-width: 365px) {
+  .stat-top > span:first-child {
+    font-size: 10px;
+  }
+  .stat-hint {
+    font-size: 8px;
+  }
+  .focus-copy h2 {
+    font-size: 27px;
+  }
+  .focus-copy p {
+    font-size: 9px;
+  }
+  .focus-eyebrow {
+    font-size: 7px;
+  }
+  .review-preview-row strong {
+    font-size: 12px;
+  }
+  .review-preview-row p {
+    font-size: 10px;
+    max-width: 200px;
+  }
+  .daily-lesson h4 {
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,166 @@
+name: Meta Education CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize deployment runs; also reject stale commits immediately before SSH.
+concurrency:
+  group: meta-education-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: meta_education
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: meta_education_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meta_education -d meta_education_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: |
+          npm install --global pnpm@11.19.0
+          pnpm install --frozen-lockfile
+      - name: Validate types and deployment scripts
+        run: |
+          pnpm exec next typegen
+          pnpm typecheck
+          bash -n deploy/activate.sh
+          shellcheck deploy/activate.sh
+          bash tests/deploy.test.sh
+          APP_IMAGE=meta-education:ci docker compose --env-file .env.production.example -f compose.production.yaml config --quiet
+      - name: Run application tests with PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql://meta_education:ci-test-password@127.0.0.1:5432/meta_education_test
+        run: pnpm test
+
+  image:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      reference: ${{ steps.reference.outputs.value }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Image name
+        id: name
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "value=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image; publish only from main
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+          tags: ${{ steps.name.outputs.value }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record immutable image reference
+        id: reference
+        env:
+          IMAGE: ${{ steps.name.outputs.value }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "value=$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Deploy only the current main commit
+        id: fresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$latest" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer main commit exists; this deployment is skipped.'
+          fi
+      - name: Configure SSH with verified host keys
+        if: steps.fresh.outputs.current == 'true'
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          umask 077
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+      - name: Upload and activate release
+        if: steps.fresh.outputs.current == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
+          DEPLOY_ROOT: ${{ vars.VPS_DEPLOY_PATH || '/opt/meta-education' }}
+          APP_IMAGE: ${{ needs.image.outputs.reference }}
+        run: |
+          set -euo pipefail
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
+          [[ "$DEPLOY_ROOT" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]]
+          [[ "$APP_IMAGE" =~ ^ghcr.io/[a-z0-9./_-]+@sha256:[a-f0-9]{64}$ ]]
+          release="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "$release" =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+$ ]]
+          bundle="$RUNNER_TEMP/release"
+          mkdir -p "$bundle/deploy"
+          cp compose.production.yaml "$bundle/"
+          cp deploy/activate.sh "$bundle/deploy/"
+          printf 'APP_IMAGE=%s\n' "$APP_IMAGE" > "$bundle/image.env"
+          tar -czf "$RUNNER_TEMP/release.tar.gz" -C "$bundle" .
+          ssh_args=(-i "$RUNNER_TEMP/deploy_key" -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          target="$VPS_USER@$VPS_HOST"
+          # The validated release ID must expand locally before sending to SSH.
+          # shellcheck disable=SC2029
+          ssh "${ssh_args[@]}" "$target" "mkdir -p $DEPLOY_ROOT/incoming $DEPLOY_ROOT/releases && cat > $DEPLOY_ROOT/incoming/$release.tar.gz" < "$RUNNER_TEMP/release.tar.gz"
+          # shellcheck disable=SC2029
+          ssh "${ssh_args[@]}" "$target" "mkdir $DEPLOY_ROOT/releases/$release && tar -xzf $DEPLOY_ROOT/incoming/$release.tar.gz -C $DEPLOY_ROOT/releases/$release && bash $DEPLOY_ROOT/releases/$release/deploy/activate.sh $DEPLOY_ROOT $release"
+      - name: Remove temporary SSH files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts"
