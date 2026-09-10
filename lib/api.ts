@@ -229,9 +229,11 @@ export async function handleApi(request: Request, route: string[]) {
       return await withDb(async (db) => {
         const email = input.email.trim().toLowerCase();
         const keys = [`email:${tokenHash(email)}`];
+        // Trust exactly one proxy hop. NPM appends the real client address;
+        // earlier values can be supplied by the client and must not affect limits.
         if (process.env.TRUST_PROXY === "true")
           keys.push(
-            `ip:${tokenHash(request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown")}`,
+            `ip:${tokenHash(request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown")}`,
           );
         db.loginAttempts = db.loginAttempts.filter(
           (a) => new Date(a.resetAt).getTime() > Date.now(),

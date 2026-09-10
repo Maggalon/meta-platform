@@ -24,12 +24,15 @@ class Client {
   async request(
     path: string,
     body?: unknown,
-    options: { origin?: string; raw?: boolean } = {},
+    options: { origin?: string; raw?: boolean; forwardedFor?: string } = {},
   ) {
     const form = body instanceof FormData;
     const response = await fetch(`${base}/api/${path}`, {
       method: body === undefined ? "GET" : "POST",
       headers: {
+        ...(options.forwardedFor
+          ? { "X-Forwarded-For": options.forwardedFor }
+          : {}),
         Cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; "),
         ...(body === undefined
           ? {}
@@ -57,6 +60,7 @@ before(async () => {
   const env = {
     ...process.env,
     DEMO_MODE: "true",
+    TRUST_PROXY: "true",
     NEXT_DIST_DIR: ".next-test",
     META_EDUCATION_DATA_DIR: `.data/test-${run}`,
     APP_URL: base,
@@ -472,4 +476,25 @@ test("complete workflow: invitation, assignment, private file, submission, gradi
       429,
     );
   });
+  await t.test(
+    "NPM client IP cannot be spoofed to bypass login limits",
+    async () => {
+      const attacker = new Client();
+      for (let i = 0; i < 11; i++) {
+        const result = await attacker.request(
+          "auth/login",
+          { email: `missing-${i}@meta-education.test`, password: "wrong" },
+          { forwardedFor: `203.0.113.${i + 1}, 198.51.100.10` },
+        );
+        assert.equal(result.response.status, i < 10 ? 401 : 429);
+      }
+      // A different client still gets an ordinary authentication response.
+      const other = await attacker.request(
+        "auth/login",
+        { email: "other-client@meta-education.test", password: "wrong" },
+        { forwardedFor: "203.0.113.1, 198.51.100.11" },
+      );
+      assert.equal(other.response.status, 401);
+    },
+  );
 });
