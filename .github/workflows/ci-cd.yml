@@ -76,27 +76,54 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" != "$GITHUB_SHA" ]]; then
+          fail() { echo "::error::$1" >&2; exit 1; }
+          stage='checking GitHub and deployment settings'
+          trap 'echo "::error::Deployment failed while $stage (line $LINENO). See the error above." >&2' ERR
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha') || fail 'Cannot read the current main commit from GitHub.'
+          if [[ "$latest" != "$GITHUB_SHA" ]]; then
             echo 'A newer main commit exists; this deployment is skipped.'
             exit 0
           fi
-          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
-          [[ "$DEPLOY_ROOT" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]]
-          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || fail 'VPS_HOST must contain only an IPv4 address or hostname, without spaces, protocol or port.'
+          [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || fail 'VPS_USER must contain only the SSH username, without spaces or @host.'
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || fail 'VPS_SSH_PORT must contain only digits.'
+          [[ "$DEPLOY_ROOT" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]] || fail 'VPS_DEPLOY_PATH must be an absolute path, without ~, spaces or a trailing slash. Run pwd -P in the project directory on the VPS.'
+          test -n "$SSH_KEY" || fail 'VPS_SSH_KEY is empty or unavailable. Add it to repository Actions Secrets.'
+          test -n "$KNOWN_HOSTS" || fail 'VPS_KNOWN_HOSTS is empty or unavailable. Add it to repository Actions Secrets.'
           umask 077
           printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
           ssh_args=(-i "$RUNNER_TEMP/deploy_key" -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target="$VPS_USER@$VPS_HOST"
+          stage='connecting over SSH and checking the server'
+          echo 'Connecting over SSH and checking the deployment directory...'
           # DEPLOY_ROOT is validated above and intentionally expands on the runner.
           # shellcheck disable=SC2029
-          ssh "${ssh_args[@]}" "$target" "test -f '$DEPLOY_ROOT/.env.production' && docker network inspect proxy >/dev/null && mkdir -p '$DEPLOY_ROOT/app'"
+          ssh "${ssh_args[@]}" "$target" "bash -s -- '$DEPLOY_ROOT'" <<'REMOTE'
+          set -euo pipefail
+          fail() { echo "::error::$1" >&2; exit 1; }
+          deploy_root=$1
+          echo 'SSH connected. Checking server prerequisites...'
+          test -d "$deploy_root" || fail "Deployment directory does not exist or is inaccessible: $deploy_root. Check VPS_DEPLOY_PATH."
+          test -f "$deploy_root/.env.production" || fail "Missing or inaccessible configuration: $deploy_root/.env.production. Place it above app/, not inside app/."
+          test -r "$deploy_root/.env.production" || fail "The SSH user cannot read $deploy_root/.env.production. Check its owner and permissions."
+          command -v docker >/dev/null || fail 'Docker is not available to the SSH user.'
+          docker info >/dev/null || fail 'The SSH user cannot access the Docker daemon without sudo. Check Docker service and docker group membership.'
+          docker compose version >/dev/null || fail 'Docker Compose v2 is not available.'
+          command -v rsync >/dev/null || fail 'rsync is not installed on the VPS.'
+          docker network inspect proxy >/dev/null || fail 'Docker network proxy is missing. Complete the Nginx Proxy Manager setup.'
+          mkdir -p "$deploy_root/app" || fail "Cannot create $deploy_root/app. Check directory ownership."
+          test -w "$deploy_root/app" || fail "The SSH user cannot write to $deploy_root/app. Check directory ownership."
+          echo 'Server prerequisites passed.'
+          REMOTE
           printf -v RSYNC_RSH '%q ' ssh "${ssh_args[@]}"
           export RSYNC_RSH
+          stage='syncing source files with rsync'
+          echo 'Syncing source files...'
           # This checkout has no build artifacts. Keep secrets outside app/.
           rsync -az --delete --exclude='/.git/' --exclude='/.env*' ./ "$target:$DEPLOY_ROOT/app/"
+          stage='building and starting Docker Compose on the VPS'
+          echo 'Building and starting Docker Compose...'
           # shellcheck disable=SC2029
           ssh "${ssh_args[@]}" "$target" "cd '$DEPLOY_ROOT/app' && docker compose --env-file ../.env.production -f compose.production.yaml up -d --build --wait --wait-timeout 180"
       - name: Remove temporary SSH files
