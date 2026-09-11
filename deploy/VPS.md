@@ -20,7 +20,7 @@ Nginx Proxy Manager устанавливается один раз на весь
 docker info --format '{{.ServerVersion}}'
 docker compose version
 sudo apt-get update && sudo apt-get install -y rsync
-sudo install -d -m 750 -o "$USER" -g "$(id -gn)" /opt/meta-education
+sudo install -d -m 750 -o "$USER" -g "$(id -gn)" /home/maggalon/meta-education
 ```
 
 Нужен Compose v2 с `up --wait`. Если нет доступа к Docker: `sudo usermod -aG docker "$USER"`, затем подключитесь заново. Node.js и Git на VPS не требуются.
@@ -32,7 +32,7 @@ sudo install -d -m 750 -o "$USER" -g "$(id -gn)" /opt/meta-education
 На компьютере, в PowerShell **из каталога проекта**, замените `USER`, `SERVER_IP` и путь к своему приватному SSH-ключу:
 
 ```powershell
-scp -i "$env:USERPROFILE\.ssh\id_ed25519" .env.production.example USER@SERVER_IP:/opt/meta-education/
+scp -i "$env:USERPROFILE\.ssh\id_ed25519" .env.production.example USER@SERVER_IP:/home/maggalon/meta-education/
 ```
 
 `id_ed25519` — пример имени существующего ключа, без `.pub`. Для нестандартного SSH-порта добавьте `-P 2222` после `scp`.
@@ -40,7 +40,7 @@ scp -i "$env:USERPROFILE\.ssh\id_ed25519" .env.production.example USER@SERVER_IP
 На VPS под тем же пользователем:
 
 ```sh
-cd /opt/meta-education
+cd /home/maggalon/meta-education
 cp -n .env.production.example .env.production
 chmod 600 .env.production
 openssl rand -hex 32
@@ -95,14 +95,14 @@ ssh-keygen -lf "$env:USERPROFILE\.ssh\meta-education_known_hosts"
 
 В GitHub: **Settings → Secrets and variables → Actions → New repository secret**:
 
-| Secret            | Значение                                                             |
-| ----------------- | -------------------------------------------------------------------- |
-| `VPS_HOST`        | IP или SSH hostname сервера                                          |
-| `VPS_USER`        | SSH-пользователь, которому принадлежит `/opt/meta-education`         |
-| `VPS_SSH_KEY`     | Всё содержимое приватного `meta-education_deploy`, включая BEGIN/END |
-| `VPS_KNOWN_HOSTS` | Содержимое проверенного `meta-education_known_hosts`                 |
+| Secret            | Значение                                                               |
+| ----------------- | ---------------------------------------------------------------------- |
+| `VPS_HOST`        | IP или SSH hostname сервера                                            |
+| `VPS_USER`        | SSH-пользователь, которому принадлежит `/home/maggalon/meta-education` |
+| `VPS_SSH_KEY`     | Всё содержимое приватного `meta-education_deploy`, включая BEGIN/END   |
+| `VPS_KNOWN_HOSTS` | Содержимое проверенного `meta-education_known_hosts`                   |
 
-Для нестандартного SSH-порта добавьте **Variable** `VPS_SSH_PORT` и указывайте порт в ручных командах (`ssh -p`, `scp -P`). Variable `VPS_DEPLOY_PATH` меняет каталог `/opt/meta-education`. CI синхронизирует его подкаталог `app/`, включая удаление устаревших исходников; настройки хранятся на уровень выше. Общий прокси находится отдельно, в `/opt/nginx-proxy-manager`.
+Для нестандартного SSH-порта добавьте **Variable** `VPS_SSH_PORT` и указывайте порт в ручных командах (`ssh -p`, `scp -P`). Путь текущего VPS закреплён прямо в `.github/workflows/ci-cd.yml`: `DEPLOY_ROOT: /home/maggalon/meta-education`. Переменная GitHub `VPS_DEPLOY_PATH` больше не используется. Для другого сервера измените `DEPLOY_ROOT` на результат `pwd -P` из его каталога проекта. CI синхронизирует его подкаталог `app/`, включая удаление устаревших исходников; настройки хранятся на уровень выше. Общий прокси находится отдельно, в `/opt/nginx-proxy-manager`.
 
 ## 5. Запустите CI/CD
 
@@ -123,7 +123,7 @@ git push -u origin main
 ## Логи и обслуживание
 
 ```sh
-cd /opt/meta-education/app
+cd /home/maggalon/meta-education/app
 dc() { docker compose --env-file ../.env.production -f compose.production.yaml "$@"; }
 dc ps
 dc logs --tail=100 app
@@ -142,6 +142,6 @@ dc exec -T postgres sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F
 
 ## Переход с прежнего названия «Точка»
 
-Для прежней установки в `/opt/tochka` сохраните `VPS_DEPLOY_PATH=/opt/tochka`, SSH-пользователя и `.env.production`. Стандартные прежние ресурсы: `COMPOSE_PROJECT_NAME=tochka-production`, `POSTGRES_USER=tochka`, `POSTGRES_DB=tochka`; при других именах используйте фактические. Это сохраняет существующий volume, аккаунты и файлы. Префикс таблиц `tochka_`, прежние cookie и `TOCHKA_DATA_DIR` поддерживаются.
+Для прежней установки в `/opt/tochka` укажите `DEPLOY_ROOT: /opt/tochka` в workflow, сохраните SSH-пользователя и `.env.production`. Стандартные прежние ресурсы: `COMPOSE_PROJECT_NAME=tochka-production`, `POSTGRES_USER=tochka`, `POSTGRES_DB=tochka`; при других именах используйте фактические. Это сохраняет существующий volume, аккаунты и файлы. Префикс таблиц `tochka_`, прежние cookie и `TOCHKA_DATA_DIR` поддерживаются.
 
 `APP_PORT=33000` больше не используется. Старый Nginx server block заменяется записью `meta-education:3000` в NPM; порядок переключения описан в [PROXY.md](PROXY.md). Прежние `current`, `previous`, `releases` и `image.env` не используются, удалять их для перехода не требуется.

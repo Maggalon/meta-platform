@@ -71,7 +71,8 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
-          DEPLOY_ROOT: ${{ vars.VPS_DEPLOY_PATH || '/meta-education' }}
+          # Confirmed on this VPS with pwd -P; independent of repository Variables.
+          DEPLOY_ROOT: /home/maggalon/meta-education
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
@@ -87,7 +88,7 @@ jobs:
           [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || fail 'VPS_HOST must contain only an IPv4 address or hostname, without spaces, protocol or port.'
           [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || fail 'VPS_USER must contain only the SSH username, without spaces or @host.'
           [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || fail 'VPS_SSH_PORT must contain only digits.'
-          [[ "$DEPLOY_ROOT" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]] || fail 'VPS_DEPLOY_PATH must be an absolute path, without ~, spaces or a trailing slash. Run pwd -P in the project directory on the VPS.'
+          [[ "$DEPLOY_ROOT" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]] || fail 'DEPLOY_ROOT must be an absolute path, without ~, spaces or a trailing slash. Run pwd -P in the project directory on the VPS.'
           test -n "$SSH_KEY" || fail 'VPS_SSH_KEY is empty or unavailable. Add it to repository Actions Secrets.'
           test -n "$KNOWN_HOSTS" || fail 'VPS_KNOWN_HOSTS is empty or unavailable. Add it to repository Actions Secrets.'
           umask 077
@@ -104,7 +105,12 @@ jobs:
           fail() { echo "::error::$1" >&2; exit 1; }
           deploy_root=$1
           echo 'SSH connected. Checking server prerequisites...'
-          test -d "$deploy_root" || fail "Deployment directory does not exist or is inaccessible: $deploy_root. Check VPS_DEPLOY_PATH."
+          printf 'SSH user: %s; starting directory: %s\n' "$(id -un)" "$(pwd -P)"
+          printf 'Deployment path: %s\n' "$deploy_root"
+          if ! test -d "$deploy_root"; then
+            ls -ld -- "$deploy_root" >&2 || true
+            fail "Deployment directory does not exist or is inaccessible: $deploy_root. Check the SSH user, server and DEPLOY_ROOT in the workflow."
+          fi
           test -f "$deploy_root/.env.production" || fail "Missing or inaccessible configuration: $deploy_root/.env.production. Place it above app/, not inside app/."
           test -r "$deploy_root/.env.production" || fail "The SSH user cannot read $deploy_root/.env.production. Check its owner and permissions."
           command -v docker >/dev/null || fail 'Docker is not available to the SSH user.'
