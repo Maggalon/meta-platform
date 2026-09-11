@@ -1,7 +1,7 @@
 # Meta Education: Docker, Nginx Proxy Manager и GitHub CI/CD
 
 ```text
-push в main → типы и тесты → исходники по SSH → Docker Compose на VPS
+push в main → тесты → сборка образа в GitHub → образ по SSH → запуск на VPS
 
 Интернет → Nginx Proxy Manager :80/:443 → общая Docker-сеть proxy
                                             ├─ meta-education:3000
@@ -19,11 +19,10 @@ Nginx Proxy Manager устанавливается один раз на весь
 ```sh
 docker info --format '{{.ServerVersion}}'
 docker compose version
-sudo apt-get update && sudo apt-get install -y rsync
 sudo install -d -m 750 -o "$USER" -g "$(id -gn)" /home/maggalon/meta-education
 ```
 
-Нужен Compose v2 с `up --wait`. Если нет доступа к Docker: `sudo usermod -aG docker "$USER"`, затем подключитесь заново. Node.js и Git на VPS не требуются.
+Нужен Compose v2 с `up --wait`. Если нет доступа к Docker: `sudo usermod -aG docker "$USER"`, затем подключитесь заново. Node.js, Git и rsync на VPS не требуются. Сборка Next.js выполняется в GitHub Actions.
 
 **Выполните [однократную настройку Nginx Proxy Manager](PROXY.md)**: создайте сеть `proxy`, подключите первый сайт и перенесите на NPM порты 80/443. Инструкция учитывает, что сейчас их занимает Nginx на сервере. Если NPM уже настроен, используйте его и ту же сеть; второй экземпляр не нужен.
 
@@ -102,7 +101,7 @@ ssh-keygen -lf "$env:USERPROFILE\.ssh\meta-education_known_hosts"
 | `VPS_SSH_KEY`     | Всё содержимое приватного `meta-education_deploy`, включая BEGIN/END   |
 | `VPS_KNOWN_HOSTS` | Содержимое проверенного `meta-education_known_hosts`                   |
 
-Для нестандартного SSH-порта добавьте **Variable** `VPS_SSH_PORT` и указывайте порт в ручных командах (`ssh -p`, `scp -P`). Путь текущего VPS закреплён прямо в `.github/workflows/ci-cd.yml`: `DEPLOY_ROOT: /home/maggalon/meta-education`. Переменная GitHub `VPS_DEPLOY_PATH` больше не используется. Для другого сервера измените `DEPLOY_ROOT` на результат `pwd -P` из его каталога проекта. CI синхронизирует его подкаталог `app/`, включая удаление устаревших исходников; настройки хранятся на уровень выше. Общий прокси находится отдельно, в `/opt/nginx-proxy-manager`.
+Для нестандартного SSH-порта добавьте **Variable** `VPS_SSH_PORT` и указывайте порт в ручных командах (`ssh -p`, `scp -P`). Путь текущего VPS закреплён прямо в `.github/workflows/ci-cd.yml`: `DEPLOY_ROOT: /home/maggalon/meta-education`. Переменная GitHub `VPS_DEPLOY_PATH` больше не используется. Для другого сервера измените `DEPLOY_ROOT` на результат `pwd -P` из его каталога проекта. CI передаёт готовый Docker-образ и обновляет только `app/compose.production.yaml`; `.env.production` хранится на уровень выше. Исходники на VPS больше не копируются. Общий прокси находится отдельно, в `/opt/nginx-proxy-manager`.
 
 ## 5. Запустите CI/CD
 
@@ -114,11 +113,17 @@ git commit -m "Use shared Nginx Proxy Manager"
 git push -u origin main
 ```
 
-Репозиторий GitHub должен быть добавлен как `origin`. В **Actions → Meta Education CI/CD** остаются два задания: `checks` проверяет типы, Compose и приложение с отдельной тестовой БД; `deploy` передаёт исходники и выполняет `docker compose up -d --build --wait`. В PR дополнительно проверяется production-сборка, а при push в `main` она выполняется на VPS.
+Репозиторий GitHub должен быть добавлен как `origin`. В **Actions → Meta Education CI/CD** остаются два задания: `checks` проверяет типы, Compose и приложение с отдельной тестовой БД; `deploy` собирает Docker-образ на GitHub runner, передаёт его через `docker save | gzip | SSH → docker load` и запускает `docker compose up -d --no-build --wait` на VPS. В PR production-сборка также проверяется в GitHub. [Загрузка готового образа](https://docs.docker.com/reference/cli/docker/image/load/).
 
-До замены контейнера завершается сборка, после запуска проверяется API с базой данных. Пересоздание одного контейнера может дать короткую паузу у платформы. NPM и первый сайт CI не перезапускает; для сборки нужен запас CPU и памяти на VPS.
+До замены контейнера завершается сборка, после запуска проверяется API с базой данных. Пересоздание одного контейнера может дать короткую паузу у платформы. NPM и первый сайт CI не перезапускает. На VPS нужна память только для работающих сервисов и загрузки образа, а место — для данных и Docker-образов. Сжатый образ передаётся потоком без отдельного архива на диске VPS. После успешного запуска удаляются только неиспользуемые образы Meta Education с меткой `io.meta-education.component=app`; volumes и образы других сайтов не затрагиваются.
 
 После запуска проверьте вход на `https://meta-edu.ru` и загрузку/скачивание файла. CI не использует ваш Yandex-бакет и не проверяет публичный сертификат. Дальше достаточно push в `main`; повторный деплой — **Run workflow** для `main`.
+
+### Переход после зависшей сборки на VPS
+
+Отправьте обновлённые `.github/workflows/ci-cd.yml` и `compose.production.yaml` в `main` и откройте новый запуск, созданный push. Повтор старого запуска использует прежний workflow со сборкой на сервере. Существующие `.env.production`, NPM, сеть `proxy` и volume Postgres сохраняются. Оставшиеся исходники и кеш старой сборки для нового деплоя не нужны; автоматической очистки общего Docker build cache нет.
+
+Задание `deploy` использует `ubuntu-24.04` (`linux/amd64`) и до сборки сверяет архитектуру Docker на VPS. Для ARM64 используйте в этом задании `runs-on: ubuntu-24.04-arm`; конфигурация приложения не меняется. Если архитектуры отличаются, деплой остановится с явной ошибкой до передачи образа.
 
 ## Логи и обслуживание
 
@@ -129,7 +134,7 @@ dc ps
 dc logs --tail=100 app
 ```
 
-После изменения env: `dc up -d --wait`. Ручная пересборка: `dc up -d --build --wait`. При ошибке версии — исправление или `git revert` и push. `down` для обновления не нужен; данные Postgres сохраняются.
+После изменения env: `dc up -d --no-build --wait`. Новая сборка и доставка — push в `main` или **Run workflow**. Не запускайте `next build` или `docker build` на VPS. При ошибке версии — исправление или `git revert` и push. `down` для обновления не нужен; данные Postgres сохраняются.
 
 Резервная копия БД:
 

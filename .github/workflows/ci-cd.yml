@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Sync source and start Docker Compose
+      - name: Build on GitHub and deploy image over SSH
         env:
           GH_TOKEN: ${{ github.token }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -96,11 +96,12 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
           ssh_args=(-i "$RUNNER_TEMP/deploy_key" -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target="$VPS_USER@$VPS_HOST"
+          runner_platform=$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')
           stage='connecting over SSH and checking the server'
           echo 'Connecting over SSH and checking the deployment directory...'
           # DEPLOY_ROOT is validated above and intentionally expands on the runner.
           # shellcheck disable=SC2029
-          ssh "${ssh_args[@]}" "$target" "bash -s -- '$DEPLOY_ROOT'" <<'REMOTE'
+          ssh "${ssh_args[@]}" "$target" "bash -s -- '$DEPLOY_ROOT' '$runner_platform'" <<'REMOTE'
           set -euo pipefail
           fail() { echo "::error::$1" >&2; exit 1; }
           deploy_root=$1
@@ -116,22 +117,34 @@ jobs:
           command -v docker >/dev/null || fail 'Docker is not available to the SSH user.'
           docker info >/dev/null || fail 'The SSH user cannot access the Docker daemon without sudo. Check Docker service and docker group membership.'
           docker compose version >/dev/null || fail 'Docker Compose v2 is not available.'
-          command -v rsync >/dev/null || fail 'rsync is not installed on the VPS.'
+          server_platform=$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')
+          test "$server_platform" = "$2" || fail "Architecture mismatch: VPS=$server_platform, GitHub runner=$2. Use a matching runner for the deploy job."
           docker network inspect proxy >/dev/null || fail 'Docker network proxy is missing. Complete the Nginx Proxy Manager setup.'
           mkdir -p "$deploy_root/app" || fail "Cannot create $deploy_root/app. Check directory ownership."
           test -w "$deploy_root/app" || fail "The SSH user cannot write to $deploy_root/app. Check directory ownership."
           echo 'Server prerequisites passed.'
           REMOTE
-          printf -v RSYNC_RSH '%q ' ssh "${ssh_args[@]}"
-          export RSYNC_RSH
-          stage='syncing source files with rsync'
-          echo 'Syncing source files...'
-          # This checkout has no build artifacts. Keep secrets outside app/.
-          rsync -az --delete --exclude='/.git/' --exclude='/.env*' ./ "$target:$DEPLOY_ROOT/app/"
-          stage='building and starting Docker Compose on the VPS'
-          echo 'Building and starting Docker Compose...'
+          stage='building the production image on the GitHub runner'
+          echo 'Building on GitHub Actions; the VPS does not run the build.'
+          timeout 15m docker build --progress=plain --label io.meta-education.component=app --label "org.opencontainers.image.revision=$GITHUB_SHA" --tag meta-education:production .
+          stage='transferring the compressed image to Docker on the VPS'
+          echo 'Sending the ready image over SSH...'
+          docker image save meta-education:production | gzip -1 | ssh "${ssh_args[@]}" "$target" 'docker image load'
+          stage='uploading the Compose configuration'
           # shellcheck disable=SC2029
-          ssh "${ssh_args[@]}" "$target" "cd '$DEPLOY_ROOT/app' && docker compose --env-file ../.env.production -f compose.production.yaml up -d --build --wait --wait-timeout 180"
+          ssh "${ssh_args[@]}" "$target" "cat > '$DEPLOY_ROOT/app/compose.production.yaml.incoming'" < compose.production.yaml
+          stage='starting the ready image on the VPS'
+          echo 'Starting containers without a VPS build...'
+          # shellcheck disable=SC2029
+          ssh "${ssh_args[@]}" "$target" "bash -s -- '$DEPLOY_ROOT'" <<'REMOTE'
+          set -euo pipefail
+          cd "$1/app"
+          docker compose --env-file ../.env.production -f compose.production.yaml.incoming config --quiet
+          mv compose.production.yaml.incoming compose.production.yaml
+          docker compose --env-file ../.env.production -f compose.production.yaml up -d --no-build --wait --wait-timeout 180
+          # Only dangling images labelled for this application; never volumes or other sites.
+          docker image prune -f --filter label=io.meta-education.component=app || echo '::warning::Could not remove unused Meta Education images.'
+          REMOTE
       - name: Remove temporary SSH files
         if: always()
         run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts"

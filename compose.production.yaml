@@ -25,7 +25,8 @@ services:
         max-file: "3"
 
   app:
-    build: .
+    image: meta-education:production
+    pull_policy: never
     restart: unless-stopped
     init: true
     expose:
