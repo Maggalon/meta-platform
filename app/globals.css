@@ -357,11 +357,17 @@ input::-webkit-inner-spin-button {
   flex: 1;
   padding: 0;
 }
+.sidebar-profile > button:first-child > span:not(.avatar) {
+  min-width: 0;
+  flex: 1;
+}
 .sidebar-profile strong {
   font-size: 10px;
   display: block;
   color: #f1f3e9;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar-profile small {
   color: #8ea28e;
@@ -377,6 +383,7 @@ input::-webkit-inner-spin-button {
   font-size: 10px;
 }
 .logout-button {
+  flex-shrink: 0;
   color: #9dad9b;
   padding: 5px;
 }

@@ -333,11 +333,10 @@ export default function Overview({
     () => {
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.from(".stat-card", {
+        gsap.from(".stats-grid", {
           y: 15,
           opacity: 0,
           duration: 0.55,
-          stagger: 0.08,
           ease: "power2.out",
         });
         gsap.from(".focus-card", {

@@ -371,7 +371,7 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
             <button onClick={() => navigate("settings")}>
               <Avatar user={data.user} />
               <span>
-                <strong>{data.user.name}</strong>
+                <strong title={data.user.name}>{data.user.name}</strong>
                 <small>{teacher ? "Преподаватель" : "Ученик"}</small>
               </span>
             </button>
