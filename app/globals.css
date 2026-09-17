@@ -1,4 +1,5 @@
 @import "./fonts.css";
+@import "./progress.css";
 
 :root {
   --ink: #27382e;
@@ -748,6 +749,16 @@ input::-webkit-inner-spin-button {
     #54704665,
     transparent 65%
   );
+}
+.overview .focus-grid,
+.overview .dashboard-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 981px) {
+  .overview .teacher-focus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
 }
 .focus-card:after {
   content: "";

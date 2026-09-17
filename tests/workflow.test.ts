@@ -391,6 +391,89 @@ test("complete workflow: invitation, assignment, private file, submission, gradi
       );
     },
   );
+  await t.test(
+    "individual lessons are visible only to the selected student and teacher",
+    async () => {
+      const payload = {
+        title: "Индивидуальный разбор",
+        studentId,
+        startsAt: new Date(Date.now() + 86400000).toISOString(),
+        duration: 60,
+        location: "https://example.com/private-lesson",
+      };
+      const result = await teacher.request("lessons", payload);
+      assert.equal(result.response.status, 201);
+      assert.equal(result.data.studentId, studentId);
+      assert.equal(result.data.groupId, undefined);
+      const otherStudent = new Client();
+      await otherStudent.request("auth/demo", { role: "student" });
+      assert.equal(
+        (await student.request("data")).data.lessons.some(
+          (l: { id: string }) => l.id === result.data.id,
+        ),
+        true,
+      );
+      assert.equal(
+        (await teacher.request("data")).data.lessons.some(
+          (l: { id: string }) => l.id === result.data.id,
+        ),
+        true,
+      );
+      assert.equal(
+        (await otherStudent.request("data")).data.lessons.some(
+          (l: { id: string }) => l.id === result.data.id,
+        ),
+        false,
+      );
+      assert.equal(
+        (await student.request("lessons", payload)).response.status,
+        403,
+      );
+      for (const target of [
+        { studentId: undefined },
+        { studentId: "missing-student" },
+        { studentId: "teacher" },
+        { groupId: "group-1" },
+      ]) {
+        assert.equal(
+          (await teacher.request("lessons", { ...payload, ...target })).response
+            .status,
+          400,
+        );
+      }
+      const invite = await teacher.request("invites", {
+        email: "individual@meta-education.test",
+      });
+      assert.equal(invite.response.status, 201);
+      const solo = new Client();
+      const registration = await solo.request("auth/register", {
+        name: "Ученик без группы",
+        email: "individual@meta-education.test",
+        password: "TestPassword2026!",
+        token: new URL(invite.data.url).searchParams.get("invite"),
+      });
+      assert.equal(registration.response.status, 201);
+      const soloData = (await solo.request("data")).data as AppData;
+      assert.equal(soloData.groups.length, 0);
+      const soloLesson = await teacher.request("lessons", {
+        ...payload,
+        studentId: soloData.user.id,
+      });
+      assert.equal(soloLesson.response.status, 201);
+      assert.equal(
+        (await solo.request("data")).data.lessons.some(
+          (l: { id: string }) => l.id === soloLesson.data.id,
+        ),
+        true,
+      );
+      assert.equal(
+        (await student.request("data")).data.lessons.some(
+          (l: { id: string }) => l.id === soloLesson.data.id,
+        ),
+        false,
+      );
+    },
+  );
   await t.test("groups, lessons and archive operations persist", async () => {
     const group = await teacher.request("groups", {
       name: "Тестовая группа",

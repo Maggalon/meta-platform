@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { withDb, isDemo } from "./db";
+import { lessonIncludesStudent } from "./lessons";
 import {
   canReadFile,
   hashPassword,
@@ -156,7 +157,7 @@ function appData(db: Database, user: User): AppData {
       .filter((f) => canReadFile(db, user, f.id))
       .map(({ key: _, storage: __, ...f }) => f),
     lessons: db.lessons.filter(
-      (l) => admin || groups.some((g) => g.id === l.groupId),
+      (l) => admin || lessonIncludesStudent(l, user.id, groups),
     ),
     demo: isDemo(),
   };
@@ -543,14 +544,23 @@ export async function handleApi(request: Request, route: string[]) {
         const data = z
           .object({
             title: nonempty,
-            groupId: nonempty,
+            groupId: nonempty.optional(),
+            studentId: nonempty.optional(),
             startsAt: z.iso.datetime({ offset: true }),
             duration: z.number().int().min(15).max(360),
             location: z.string().trim().max(300),
           })
+          .refine(
+            (lesson) => Boolean(lesson.groupId) !== Boolean(lesson.studentId),
+            {
+              message:
+                "Выберите группу или ученика для индивидуального занятия",
+            },
+          )
           .parse(input);
-        if (!db.groups.some((g) => g.id === data.groupId))
+        if (data.groupId && !db.groups.some((g) => g.id === data.groupId))
           fail(400, "Группа не найдена");
+        if (data.studentId) studentsExist(db, [data.studentId]);
         const lesson = { ...data, id: id() };
         db.lessons.push(lesson);
         return json(lesson, 201);

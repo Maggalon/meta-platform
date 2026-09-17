@@ -77,7 +77,7 @@ export default function AuthScreen({
           <p>
             Знания, поддержка и немного упорства.
             <br />
-            Всё остальное мы собрали в Точке.
+            Всё остальное мы собрали в Мете.
           </p>
           <div className="auth-art" aria-hidden="true">
             <div />

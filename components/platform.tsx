@@ -9,7 +9,6 @@ import {
   ChartNoAxesCombined,
   CalendarDays,
   Settings2,
-  CircleHelp,
   ArrowUpRight,
   Plus,
   Search,
@@ -34,12 +33,12 @@ import type {
 } from "@/lib/types";
 import { api, Avatar, Logo, Modal, dateLabel, EmptyState } from "./ui";
 import Overview from "./overview";
+import { GradebookView } from "./gradebook";
 import {
   AssignmentsView,
   ReviewView,
   StudentsView,
   GroupsView,
-  GradebookView,
   ScheduleView,
   SettingsView,
 } from "./views";
@@ -69,7 +68,7 @@ const descriptions: Record<View, string> = {
   review: "Ваши комментарии помогают ученикам расти.",
   students: "Разные пути. Общая цель — уверенный результат.",
   groups: "Объединяйте учеников и двигайтесь к цели вместе.",
-  gradebook: "Весь путь к результату — в одной таблице.",
+  gradebook: "У каждого свой темп. Задания и результаты каждого ученика.",
   schedule: "У каждого важного шага есть своё время.",
   settings: "Пусть ваше пространство будет удобным.",
 };
@@ -239,7 +238,10 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
     );
   const teacher = data.user.role === "teacher";
   const currentView =
-    !teacher && ["students", "groups"].includes(view) ? "overview" : view;
+    (teacher && view === "assignments") ||
+    (!teacher && ["students", "groups", "gradebook", "review"].includes(view))
+      ? "overview"
+      : view;
   const pending = data.submissions.filter((s) => s.status === "pending");
   const firstName = data.user.name.split(" ")[0];
   const title =
@@ -318,7 +320,11 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
         <div className="nav-label">ВАШЕ ПРОСТРАНСТВО</div>
         <nav aria-label="Главная навигация">
           {navigation
-            .filter((n) => teacher || !["students", "groups"].includes(n.id))
+            .filter((n) =>
+              teacher
+                ? n.id !== "assignments"
+                : !["students", "groups", "gradebook", "review"].includes(n.id),
+            )
             .map((n) => (
               <a
                 href={`/#${n.id}`}
@@ -331,9 +337,7 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
                 }}
               >
                 <n.icon size={19} strokeWidth={1.65} />
-                <span>
-                  {n.id === "review" && !teacher ? "Мои работы" : n.label}
-                </span>
+                <span>{n.label}</span>
                 {n.id === "review" && pending.length > 0 && (
                   <b>{pending.length}</b>
                 )}
@@ -358,14 +362,6 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
           >
             <Settings2 size={19} />
             <span>Настройки</span>
-          </button>
-          <button
-            className="nav-item"
-            onClick={() => setModal({ type: "help" })}
-          >
-            <CircleHelp size={19} />
-            <span>Помощь и поддержка</span>
-            <ArrowUpRight size={15} />
           </button>
           <div className="sidebar-profile">
             <button onClick={() => navigate("settings")}>
@@ -557,11 +553,7 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
                   </span>
                 )}
               </h1>
-              <p>
-                {!teacher && currentView === "review"
-                  ? "Ваши решения и комментарии преподавателя."
-                  : descriptions[currentView]}
-              </p>
+              <p>{descriptions[currentView]}</p>
             </div>
             {teacher && currentView !== "settings" && (
               <button
@@ -597,14 +589,14 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
               openLesson={() => setModal({ type: "lesson" })}
             />
           )}{" "}
-          {currentView === "assignments" && (
+          {currentView === "assignments" && !teacher && (
             <AssignmentsView
               {...common}
               onOpen={openAssignment}
               onCreate={() => setModal({ type: "createAssignment" })}
             />
           )}{" "}
-          {currentView === "review" && (
+          {currentView === "review" && teacher && (
             <ReviewView {...common} onOpen={openReview} />
           )}{" "}
           {currentView === "students" && teacher && (
@@ -621,7 +613,7 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
               onCreate={() => setModal({ type: "group" })}
             />
           )}{" "}
-          {currentView === "gradebook" && (
+          {currentView === "gradebook" && teacher && (
             <GradebookView
               {...common}
               onReview={openReview}
@@ -722,7 +714,7 @@ export default function Platform({ demoEnabled }: { demoEnabled: boolean }) {
       {modal?.type === "help" && (
         <Modal
           title="Мы рядом"
-          subtitle="Ответы на частые вопросы о Точке"
+          subtitle="Ответы на частые вопросы о Мете"
           onClose={closeModal}
         >
           <div className="help-content">

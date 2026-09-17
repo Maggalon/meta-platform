@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { lessonIncludesStudent } from "@/lib/lessons";
 import {
   ArrowUpRight,
   Copy,
@@ -782,6 +783,12 @@ export function GroupForm({
   );
 }
 export function LessonForm({ data, onDone }: FormProps) {
+  const [lessonType, setLessonType] = useState(
+    data.groups.length ? "group" : "individual",
+  );
+  const students = data.users
+    .filter((u) => u.role === "student")
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -792,7 +799,9 @@ export function LessonForm({ data, onDone }: FormProps) {
     try {
       await api("lessons", {
         title: f.get("title"),
-        groupId: f.get("groupId"),
+        ...(lessonType === "individual"
+          ? { studentId: f.get("studentId") }
+          : { groupId: f.get("groupId") }),
         startsAt: new Date(f.get("startsAt") as string).toISOString(),
         duration: Number(f.get("duration")),
         location: f.get("location"),
@@ -816,16 +825,50 @@ export function LessonForm({ data, onDone }: FormProps) {
         />
       </label>
       <label>
-        Группа
-        <select name="groupId" required>
-          <option value="">Выберите группу</option>
-          {data.groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
+        Тип занятия
+        <select
+          value={lessonType}
+          onChange={(e) => setLessonType(e.target.value)}
+        >
+          <option value="group">Групповое</option>
+          <option value="individual">Индивидуальное</option>
         </select>
       </label>
+      {lessonType === "individual" ? (
+        <label>
+          Ученик
+          <select name="studentId" required defaultValue="">
+            <option value="">Выберите ученика</option>
+            {students.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name} · {u.email}
+              </option>
+            ))}
+          </select>
+          {!students.length && (
+            <span className="muted">
+              Сначала пригласите ученика в разделе «Ученики».
+            </span>
+          )}
+        </label>
+      ) : (
+        <label>
+          Группа
+          <select name="groupId" required defaultValue="">
+            <option value="">Выберите группу</option>
+            {data.groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          {!data.groups.length && (
+            <span className="muted">
+              Создайте группу или выберите индивидуальное занятие.
+            </span>
+          )}
+        </label>
+      )}
       <div className="form-grid">
         <label>
           Дата и время
@@ -884,7 +927,7 @@ export function StudentProfile({
   const lessons = data.lessons
     .filter(
       (l) =>
-        groups.some((g) => g.id === l.groupId) &&
+        lessonIncludesStudent(l, u.id, data.groups) &&
         new Date(l.startsAt) > new Date(),
     )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));

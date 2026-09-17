@@ -55,7 +55,8 @@ export type Attachment = {
 export type Lesson = {
   id: string;
   title: string;
-  groupId: string;
+  groupId?: string;
+  studentId?: string;
   startsAt: string;
   duration: number;
   location: string;

@@ -1,0 +1,246 @@
+.individual-gradebook {
+  display: grid;
+  gap: 22px;
+}
+.gradebook-modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #e9ede3;
+  border-radius: 10px;
+  width: fit-content;
+}
+.gradebook-modes button {
+  padding: 11px 18px;
+  border-radius: 7px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.gradebook-modes button:hover {
+  background: #f6f7f2;
+}
+.gradebook-modes button[aria-pressed="true"] {
+  background: white;
+  color: var(--green);
+  box-shadow: 0 2px 5px #27382e0a;
+}
+.progress-controls {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.progress-controls label,
+.progress-assignments header label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: #64705e;
+}
+.progress-controls select,
+.progress-assignments select {
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  padding: 11px 32px 11px 12px;
+  border-radius: 7px;
+  min-height: 42px;
+  max-width: 100%;
+}
+.progress-controls .progress-student-select {
+  flex: 1;
+  min-width: 180px;
+}
+.progress-controls .progress-archive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+.progress-summary {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+.progress-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.progress-identity h2 {
+  margin: 6px 0;
+  font-size: 23px;
+  letter-spacing: -0.6px;
+  overflow-wrap: anywhere;
+}
+.progress-identity p,
+.progress-completion p,
+.progress-explanation,
+.progress-assignments header p {
+  color: #707b69;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.progress-eyebrow {
+  color: #6b7d5a;
+  font-size: 12px;
+}
+.progress-completion {
+  align-self: center;
+}
+.progress-completion > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.progress-completion progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0 8px;
+  background: #edf1e6;
+  accent-color: #779553;
+}
+.progress-completion progress::-webkit-progress-bar {
+  background: #edf1e6;
+}
+.progress-completion progress::-webkit-progress-value {
+  background: #779553;
+  border-radius: 4px;
+}
+.progress-completion progress::-moz-progress-bar {
+  background: #779553;
+}
+.progress-metrics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  gap: 24px;
+}
+.progress-metrics dt {
+  color: #707b69;
+  font-size: 12px;
+}
+.progress-metrics dd {
+  margin: 9px 0 0;
+  font-size: 28px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.progress-metrics small {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #707b69;
+}
+.progress-explanation {
+  grid-column: 1 / -1;
+}
+.progress-assignments {
+  min-width: 0;
+  overflow: hidden;
+}
+.progress-assignments header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 28px;
+}
+.progress-assignments h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+.individual-assignments-table {
+  width: 100%;
+  min-width: 830px;
+  border-collapse: collapse;
+}
+.individual-assignments-table th {
+  text-align: left;
+  padding: 14px 20px;
+  font-size: 12px;
+  color: #6b775f;
+  background: #fafbf7;
+  font-weight: 500;
+}
+.individual-assignments-table td {
+  padding: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: top;
+}
+.individual-assignments-table tbody tr:hover {
+  background: #fafbf7;
+}
+.individual-assignments-table td:first-child {
+  width: 27%;
+}
+.individual-assignments-table td > small {
+  display: block;
+  margin-top: 7px;
+  color: #707b69;
+  font-size: 11px;
+}
+.individual-assignments-table td:nth-child(2),
+.individual-assignments-table td:nth-child(4) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.progress-assignment-title {
+  text-align: left;
+  padding: 0;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.progress-assignment-title:hover,
+.gradebook-student:hover strong {
+  color: #688647;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.progress-feedback {
+  max-width: 280px;
+  min-width: 120px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  color: #65705d;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gradebook-student {
+  text-align: left;
+  padding: 0;
+}
+@media (max-width: 800px) {
+  .progress-summary {
+    grid-template-columns: 1fr;
+    padding: 22px;
+    gap: 22px;
+  }
+  .progress-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .progress-controls > label:not(.progress-archive) {
+    flex: 1 1 180px;
+  }
+  .progress-assignments header {
+    padding: 20px;
+    flex-wrap: wrap;
+  }
+  .progress-identity h2 {
+    font-size: 21px;
+  }
+}

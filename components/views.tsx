@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { lessonIncludesStudent, lessonParticipants } from "@/lib/lessons";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -466,7 +467,7 @@ export function StudentsView({
                 const lesson = data.lessons
                   .filter(
                     (l) =>
-                      groups.some((g) => g.id === l.groupId) &&
+                      lessonIncludesStudent(l, u.id, data.groups) &&
                       new Date(l.startsAt) > new Date(),
                   )
                   .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
@@ -650,14 +651,16 @@ export function GroupsView({
     </div>
   );
 }
-export function GradebookView({
+export function ClassGradebookView({
   data,
   query,
   onReview,
   onAssignment,
+  onStudent,
 }: {
   onReview: (s: Submission) => void;
   onAssignment: (a: Assignment) => void;
+  onStudent: (id: string) => void;
 } & Shared) {
   const [group, setGroup] = useState("all");
   const students = data.users.filter(
@@ -780,10 +783,14 @@ export function GradebookView({
                 return (
                   <tr key={u.id}>
                     <td>
-                      <div className="person-cell">
+                      <button
+                        className="person-cell gradebook-student"
+                        onClick={() => onStudent(u.id)}
+                        title={`Прогресс: ${u.name}`}
+                      >
                         <Avatar user={u} size="small" />
                         <strong>{u.name}</strong>
-                      </div>
+                      </button>
                     </td>
                     {assignments.map((a) => {
                       const s = data.submissions.find(
@@ -892,7 +899,9 @@ export function ScheduleView({
             .filter(
               (l) =>
                 new Date(l.startsAt).toDateString() === day.toDateString() &&
-                l.title.toLowerCase().includes(query.toLowerCase()),
+                `${l.title} ${lessonParticipants(l, data)}`
+                  .toLowerCase()
+                  .includes(query.toLowerCase()),
             )
             .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
           return (
@@ -933,7 +942,7 @@ export function ScheduleView({
                         )}
                       </span>
                       <h3>{l.title}</h3>
-                      <p>{group?.name}</p>
+                      <p>{lessonParticipants(l, data)}</p>
                       <div>
                         <Clock3 size={12} />
                         {l.duration} мин
