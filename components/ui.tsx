@@ -70,15 +70,13 @@ export function Logo({ dark = false }: { dark?: boolean }) {
       className={`brand ${dark ? "brand-dark" : ""}`}
       aria-label="Meta Education"
     >
-      <svg viewBox="0 0 40 40" aria-hidden="true">
+      <svg viewBox="13 11 38 44" aria-hidden="true">
         <path
-          d="M20 0C6 0 0 8 0 20h20V0zm0 20v20c14 0 20-8 20-20H20z"
+          d="M15 52.45L23 49.55V34.55L15 37.45ZM28 52.45L36 49.55V24.55L28 27.45ZM41 52.45L49 49.55V12.55L41 15.45Z"
           fill="currentColor"
-        />
-        <path
-          d="M20 0v20h20C40 6 32 0 20 0zM0 20c0 14 8 20 20 20V20H0z"
-          fill="currentColor"
-          opacity=".55"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
         />
       </svg>
       <span className="brand-wordmark">

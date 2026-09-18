@@ -194,6 +194,32 @@ input::-webkit-inner-spin-button {
 .brand-dark > svg {
   color: #72915b;
 }
+.brand-mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 27px;
+  flex-shrink: 0;
+}
+.brand-mark i {
+  display: block;
+  width: 6px;
+  background: #d6e99f;
+  border-radius: 1px;
+  transform: skewY(-20deg);
+}
+.brand-mark i:nth-child(1) {
+  height: 14px;
+}
+.brand-mark i:nth-child(2) {
+  height: 21px;
+}
+.brand-mark i:nth-child(3) {
+  height: 27px;
+}
+.brand-dark .brand-mark i {
+  background: #72915b;
+}
 .brand-caption {
   font-size: 9px;
   margin: 13px 0 32px 12px;

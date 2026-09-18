@@ -5,7 +5,11 @@ export const metadata: Metadata = {
   title: "Meta Education — пространство для роста",
   description:
     "Подготовка к ЕГЭ: задания, обратная связь и прогресс в одном пространстве.",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 export default function RootLayout({
   children,
