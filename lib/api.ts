@@ -3,6 +3,39 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { withDb, isDemo } from "./db";
 import { lessonIncludesStudent } from "./lessons";
+import { workbookSchema, type WorkbookResult } from "./workbook";
+import { odysseySchema, type OdysseyResult } from "./odyssey";
+import {
+  failureEntrySchema,
+  sortFailureEntries,
+  type FailureEntry,
+} from "./failure-journal";
+import {
+  compassSchema,
+  compassAnalysisSchema,
+  reserveAiRequest,
+  type CompassResult,
+} from "./compass";
+import {
+  analyzeCompass,
+  analyzeDiary,
+  suggestMapIdea,
+  deepseekAvailable,
+  DeepSeekError,
+} from "./deepseek";
+import {
+  diaryDaySchema,
+  diaryDateSchema,
+  diaryReflectionSchema,
+  newDiary,
+  maxDiaryDays,
+  reflectionUnlocked,
+} from "./diary";
+import {
+  mindMapSchema,
+  diaryMapSuggestions,
+  type MindMapResult,
+} from "./mind-map";
 import {
   canReadFile,
   hashPassword,
@@ -14,6 +47,13 @@ import {
 } from "./security";
 import { storeFile, downloadFile } from "./storage";
 import type { Database, User, AppData, Attachment } from "./types";
+import {
+  canTeach,
+  canManage,
+  canManageAccess,
+  hasWorkspace,
+  inviteRoles,
+} from "./access";
 z.config(z.locales.ru());
 
 const COOKIE = "meta_education_session";
@@ -111,8 +151,16 @@ async function getUser(db: Database, bootstrap = false): Promise<User> {
   return user || fail(401, "Войдите в аккаунт, чтобы продолжить");
 }
 function teacher(user: User) {
-  if (user.role !== "teacher") fail(403, "Доступно только преподавателю");
+  if (!canTeach(user.role))
+    fail(403, "Доступно только преподавателю или администратору");
 }
+const workspaceIdsSchema = z
+  .array(z.enum(["math", "design"]))
+  .max(2)
+  .refine(
+    (values) => new Set(values).size === values.length,
+    "Пространства не должны повторяться",
+  );
 function studentsExist(db: Database, values: string[]) {
   if (
     new Set(values).size !== values.length ||
@@ -139,25 +187,40 @@ function validateAttachments(
     fail(403, "Нет доступа к одному из вложений");
 }
 function appData(db: Database, user: User): AppData {
-  const admin = user.role === "teacher";
+  const teaching = canTeach(user.role);
+  const management = canManage(user.role);
+  const math = hasWorkspace(user, "math");
   const groups = db.groups.filter(
-    (g) => admin || g.studentIds.includes(user.id),
+    (g) => management || (math && (teaching || g.studentIds.includes(user.id))),
   );
   return {
     user: safeUser(user),
     users: db.users
-      .filter((u) => admin || u.id === user.id || u.role === "teacher")
+      .filter(
+        (u) =>
+          u.id === user.id ||
+          user.role === "admin" ||
+          (management && canManageAccess(u.role)) ||
+          (teaching && math && u.role === "student") ||
+          (user.role === "student" &&
+            canTeach(u.role) &&
+            user.workspaceIds.some((space) => hasWorkspace(u, space))),
+      )
       .map(safeUser),
-    groups: groups.map((g) => (admin ? g : { ...g, studentIds: [user.id] })),
+    groups: groups.map((g) =>
+      teaching || management ? g : { ...g, studentIds: [user.id] },
+    ),
     assignments: db.assignments
-      .filter((a) => admin || a.studentIds.includes(user.id))
-      .map((a) => (admin ? a : { ...a, studentIds: [user.id] })),
-    submissions: db.submissions.filter((s) => admin || s.studentId === user.id),
+      .filter((a) => math && (teaching || a.studentIds.includes(user.id)))
+      .map((a) => (teaching ? a : { ...a, studentIds: [user.id] })),
+    submissions: db.submissions.filter(
+      (s) => math && (teaching || s.studentId === user.id),
+    ),
     files: db.files
       .filter((f) => canReadFile(db, user, f.id))
       .map(({ key: _, storage: __, ...f }) => f),
     lessons: db.lessons.filter(
-      (l) => admin || lessonIncludesStudent(l, user.id, groups),
+      (l) => math && (teaching || lessonIncludesStudent(l, user.id, groups)),
     ),
     demo: isDemo(),
   };
@@ -181,9 +244,9 @@ async function limitedBody(request: Request, limit: number): Promise<Buffer> {
   }
   return Buffer.concat(parts);
 }
-async function body(request: Request) {
+async function body(request: Request, limit = 256 * 1024) {
   try {
-    return JSON.parse((await limitedBody(request, 256 * 1024)).toString());
+    return JSON.parse((await limitedBody(request, limit)).toString());
   } catch (error) {
     if (error instanceof HttpError) throw error;
     return fail(400, "Некорректный запрос");
@@ -193,6 +256,29 @@ async function body(request: Request) {
 export async function handleApi(request: Request, route: string[]) {
   try {
     const endpoint = route.join("/");
+    // Resolve current permissions from the database, including for existing sessions.
+    const endpointUser = async (db: Database, bootstrap = false) => {
+      const user = await getUser(db, bootstrap);
+      if (route[0] === "workbook") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        if (!hasWorkspace(user, "design"))
+          fail(403, "Доступ к пространству «Проектирование» закрыт");
+      }
+      if (
+        [
+          "assignments",
+          "submissions",
+          "reviews",
+          "groups",
+          "lessons",
+          "files",
+        ].includes(route[0]) &&
+        !hasWorkspace(user, "math")
+      )
+        fail(403, "Доступ к пространству «Математика» закрыт");
+      return user;
+    };
     if (request.method !== "GET") {
       const origin = request.headers.get("origin");
       const allowed = originFor(request);
@@ -201,8 +287,214 @@ export async function handleApi(request: Request, route: string[]) {
     }
     if (endpoint === "data" && request.method === "GET")
       return await withDb(async (db) =>
-        json(appData(db, await getUser(db, true))),
+        json(appData(db, await endpointUser(db, true))),
       );
+    if (
+      (endpoint === "workbook/1" || endpoint === "workbook/1/pdf") &&
+      request.method === "GET"
+    ) {
+      const result = await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        return (
+          db.workbookResults.find((item) => item.studentId === user.id) ?? null
+        );
+      }, false);
+      if (endpoint === "workbook/1") return json({ result });
+      if (!result) return fail(404, "Сначала заполните и сохраните блок");
+      const { createWorkbookPdf } = await import("./workbook-pdf");
+      const pdf = await createWorkbookPdf(result);
+      return new Response(new Uint8Array(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'attachment; filename="workbook-block-1.pdf"',
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    if (
+      (endpoint === "workbook/2" || endpoint === "workbook/2/pdf") &&
+      request.method === "GET"
+    ) {
+      const result = await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        return (
+          db.compassResults.find((item) => item.studentId === user.id) ?? null
+        );
+      }, false);
+      if (endpoint === "workbook/2")
+        return json({ result, aiAvailable: deepseekAvailable() });
+      if (!result)
+        return fail(404, "Сначала сохраните компас или его черновик");
+      const { createCompassPdf } = await import("./compass-pdf");
+      return new Response(new Uint8Array(await createCompassPdf(result)), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'attachment; filename="workbook-compass.pdf"',
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    if (endpoint === "workbook/6" && request.method === "GET") {
+      return await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        return json({
+          entries: sortFailureEntries(
+            db.failureEntries.filter((item) => item.studentId === user.id),
+          ),
+        });
+      }, false);
+    }
+    if (endpoint === "workbook/5" && request.method === "GET") {
+      return await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const compass = db.compassResults.find(
+          (item) => item.studentId === user.id,
+        );
+        return json({
+          result:
+            db.odysseyPlans.find((item) => item.studentId === user.id) ?? null,
+          compass: compass
+            ? {
+                work: compass.work,
+                life: compass.life,
+                alignment: compass.alignment,
+                savedAt: compass.savedAt,
+              }
+            : null,
+        });
+      }, false);
+    }
+    if (
+      ["workbook/4", "workbook/4/pdf"].includes(endpoint) &&
+      request.method === "GET"
+    ) {
+      const source = await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        return {
+          result:
+            db.mindMaps.find((item) => item.studentId === user.id) ?? null,
+          suggestions:
+            endpoint === "workbook/4"
+              ? diaryMapSuggestions(
+                  db.timeDiaries.find((item) => item.studentId === user.id)
+                    ?.days ?? [],
+                )
+              : [],
+        };
+      }, false);
+      if (endpoint === "workbook/4")
+        return json({ ...source, aiAvailable: deepseekAvailable() });
+      if (!source.result) return fail(404, "Сначала сохраните карту");
+      const { createMindMapPdf } = await import("./mind-map-pdf");
+      return new Response(
+        new Uint8Array(await createMindMapPdf(source.result)),
+        {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="workbook-map.pdf"',
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+    if (endpoint === "workbook/4/analyze" && request.method === "POST") {
+      const { ideaId } = z
+        .object({ ideaId: z.string().min(1).max(100) })
+        .parse(await body(request));
+      const idea = await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const item = db.mindMaps
+          .find((map) => map.studentId === user.id)
+          ?.ideas.find((idea) => idea.id === ideaId);
+        if (!item) return fail(404, "Карточка идеи не найдена");
+        if (!deepseekAvailable())
+          throw new DeepSeekError(
+            503,
+            "Помощь ИИ пока не подключена. Сформулируйте идею самостоятельно.",
+          );
+        const usage = reserveAiRequest(db.aiUsage, user.id);
+        if (!usage)
+          return fail(429, "Слишком много запросов к ИИ. Попробуйте позже.");
+        db.aiUsage = usage;
+        return item;
+      });
+      return json({
+        suggestion: await suggestMapIdea(idea.words, {
+          signal: request.signal,
+        }),
+      });
+    }
+    if (endpoint === "workbook/3" && request.method === "GET") {
+      return await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        return json({
+          result:
+            db.timeDiaries.find((item) => item.studentId === user.id) ??
+            newDiary(user.id),
+          aiAvailable: deepseekAvailable(),
+        });
+      }, false);
+    }
+    if (endpoint === "workbook/3/analyze" && request.method === "POST") {
+      const source = await withDb(async (db) => {
+        const user = await endpointUser(db);
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const diary = db.timeDiaries.find((item) => item.studentId === user.id);
+        if (!diary || !reflectionUnlocked(diary.days))
+          return fail(400, "Для рефлексии сохраните минимум 7 дней дневника");
+        if (!deepseekAvailable())
+          throw new DeepSeekError(
+            503,
+            "Помощь ИИ пока не подключена. Вы можете заполнить рефлексию самостоятельно.",
+          );
+        const usage = reserveAiRequest(db.aiUsage, user.id);
+        if (!usage)
+          return fail(429, "Слишком много запросов к ИИ. Попробуйте позже.");
+        db.aiUsage = usage;
+        return { days: diary.days, revision: diary.revision };
+      });
+      const suggestion = await analyzeDiary(source.days, {
+        signal: request.signal,
+      });
+      return json({ suggestion, revision: source.revision });
+    }
+    if (endpoint === "workbook/2/analyze" && request.method === "POST") {
+      const user = await withDb((db) => endpointUser(db), false);
+      if (user.role !== "student")
+        fail(403, "Рабочая тетрадь доступна ученику");
+      const input = compassAnalysisSchema.parse(await body(request));
+      if (!deepseekAvailable())
+        throw new DeepSeekError(
+          503,
+          "Помощь ИИ пока не подключена. Вы можете заполнить ответы самостоятельно.",
+        );
+      await withDb((db) => {
+        const usage = reserveAiRequest(db.aiUsage, user.id);
+        if (!usage)
+          return fail(429, "Слишком много запросов к ИИ. Попробуйте позже.");
+        db.aiUsage = usage;
+      });
+      // Release the database transaction before waiting on the external service.
+      const suggestion = await analyzeCompass(input.work, input.life, {
+        signal: request.signal,
+      });
+      return json({ suggestion });
+    }
     if (endpoint === "auth/invite" && request.method === "GET") {
       const token = new URL(request.url).searchParams.get("token") || "";
       return await withDb((db) => {
@@ -221,6 +513,8 @@ export async function handleApi(request: Request, route: string[]) {
           );
         return json({
           email: invite.email,
+          role: invite.role,
+          workspaceIds: invite.workspaceIds,
           group: db.groups.find((g) => g.id === invite.groupId)?.name,
         });
       }, false);
@@ -301,7 +595,8 @@ export async function handleApi(request: Request, route: string[]) {
           id: id(),
           name: input.name,
           email,
-          role: "student",
+          role: invite.role,
+          workspaceIds: [...invite.workspaceIds],
           passwordHash: hashPassword(input.password),
           color: "sage",
           createdAt: new Date().toISOString(),
@@ -309,7 +604,7 @@ export async function handleApi(request: Request, route: string[]) {
         db.users.push(user);
         invite.usedAt = new Date().toISOString();
         const group = db.groups.find((g) => g.id === invite.groupId);
-        if (group) group.studentIds.push(user.id);
+        if (group && user.role === "student") group.studentIds.push(user.id);
         await clearLoggedOut();
         await createSession(db, user.id);
         return json({ user: safeUser(user) }, 201);
@@ -333,13 +628,19 @@ export async function handleApi(request: Request, route: string[]) {
     if (endpoint === "auth/demo" && request.method === "POST") {
       if (!isDemo()) fail(404, "Страница не найдена");
       const input = z
-        .object({ role: z.enum(["teacher", "student"]) })
+        .object({ role: z.enum(["teacher", "student", "manager", "admin"]) })
         .parse(await body(request));
       return await withDb(async (db) => {
         const user =
           db.users.find(
             (u) =>
-              u.id === (input.role === "teacher" ? "teacher" : "student-1"),
+              u.id ===
+              {
+                teacher: "teacher",
+                student: "student-1",
+                manager: "demo-manager",
+                admin: "demo-admin",
+              }[input.role],
           ) || fail(404, "Демоаккаунт не найден");
         await clearLoggedOut();
         await createSession(db, user.id);
@@ -352,14 +653,14 @@ export async function handleApi(request: Request, route: string[]) {
       request.method === "GET"
     ) {
       const file = await withDb(async (db) => {
-        const user = await getUser(db);
+        const user = await endpointUser(db);
         if (!canReadFile(db, user, route[1])) fail(404, "Файл не найден");
         return db.files.find((f) => f.id === route[1])!;
       }, false);
       return await downloadFile(file);
     }
     if (endpoint === "files" && request.method === "POST") {
-      const user = await withDb((db) => getUser(db), false);
+      const user = await withDb((db) => endpointUser(db), false);
       const bytes = await limitedBody(request, 21 * 1024 * 1024);
       const form = await new Request(request.url, {
         method: "POST",
@@ -373,6 +674,8 @@ export async function handleApi(request: Request, route: string[]) {
         .enum(["material", "submission", "review"])
         .parse(form.get("kind"));
       if (kind !== "submission") teacher(user);
+      else if (user.role !== "student")
+        fail(403, "Сдавать работы могут только ученики");
       const buffer = Buffer.from(await upload.arrayBuffer());
       if (!validateFile(buffer, upload.type, upload.size))
         fail(400, "Допустимы настоящие JPG, PNG и PDF до 20 МБ");
@@ -388,7 +691,8 @@ export async function handleApi(request: Request, route: string[]) {
         kind,
         storage,
       };
-      await withDb((db) => {
+      await withDb(async (db) => {
+        await endpointUser(db);
         db.files.push(record);
       });
       return json(
@@ -402,9 +706,199 @@ export async function handleApi(request: Request, route: string[]) {
       );
     }
     if (request.method !== "POST") fail(404, "Страница не найдена");
-    const input = await body(request);
+    const input = await body(
+      request,
+      endpoint === "workbook/5"
+        ? 4 * 1024 * 1024
+        : endpoint === "workbook/4"
+          ? 1024 * 1024
+          : 256 * 1024,
+    );
     return await withDb(async (db) => {
-      const user = await getUser(db);
+      const user = await endpointUser(db);
+      if (endpoint === "workbook/6") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const parsed = z
+          .object({
+            id: z.string().uuid(),
+            revision: z.number().int().nonnegative(),
+            entry: failureEntrySchema,
+          })
+          .parse(input);
+        const previous = db.failureEntries.find(
+          (item) => item.id === parsed.id,
+        );
+        if (previous && previous.studentId !== user.id)
+          fail(404, "Запись не найдена");
+        if ((previous?.revision ?? 0) !== parsed.revision)
+          fail(
+            409,
+            "Запись изменена в другой вкладке. Скопируйте новые тексты перед обновлением страницы.",
+          );
+        const now = new Date().toISOString();
+        const result: FailureEntry = {
+          ...parsed.entry,
+          id: parsed.id,
+          studentId: user.id,
+          revision: parsed.revision + 1,
+          createdAt: previous?.createdAt ?? now,
+          savedAt: now,
+        };
+        db.failureEntries = db.failureEntries.filter(
+          (item) => item.id !== result.id,
+        );
+        db.failureEntries.push(result);
+        return json({ result });
+      }
+      if (endpoint === "workbook/5") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const parsed = z
+          .object({
+            plan: odysseySchema,
+            revision: z.number().int().nonnegative(),
+          })
+          .parse(input);
+        const previous = db.odysseyPlans.find(
+          (item) => item.studentId === user.id,
+        );
+        if ((previous?.revision ?? 0) !== parsed.revision)
+          return fail(
+            409,
+            "Планы изменились в другой вкладке. Скопируйте новые тексты перед обновлением страницы.",
+          );
+        const result: OdysseyResult = {
+          ...parsed.plan,
+          id: `workbook-5:${user.id}`,
+          studentId: user.id,
+          revision: parsed.revision + 1,
+          savedAt: new Date().toISOString(),
+        };
+        db.odysseyPlans = db.odysseyPlans.filter(
+          (item) => item.studentId !== user.id,
+        );
+        db.odysseyPlans.push(result);
+        return json({ result });
+      }
+      if (endpoint === "workbook/4") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const parsed = z
+          .object({
+            map: mindMapSchema,
+            revision: z.number().int().nonnegative(),
+          })
+          .parse(input);
+        const previous = db.mindMaps.find((item) => item.studentId === user.id);
+        if ((previous?.revision ?? 0) !== parsed.revision)
+          fail(
+            409,
+            "Карта изменена в другой вкладке. Сохраните свой текст и обновите страницу.",
+          );
+        const result: MindMapResult = {
+          ...parsed.map,
+          id: `workbook-4:${user.id}`,
+          studentId: user.id,
+          revision: parsed.revision + 1,
+          savedAt: new Date().toISOString(),
+        };
+        db.mindMaps = db.mindMaps.filter((item) => item.studentId !== user.id);
+        db.mindMaps.push(result);
+        return json({ result });
+      }
+      if (
+        [
+          "workbook/3/day",
+          "workbook/3/day/delete",
+          "workbook/3/reflection",
+        ].includes(endpoint)
+      ) {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        let diary = db.timeDiaries.find((item) => item.studentId === user.id);
+        if (!diary) {
+          diary = newDiary(user.id);
+          db.timeDiaries.push(diary);
+        }
+        if (endpoint === "workbook/3/day") {
+          const { day, mode } = z
+            .object({ day: diaryDaySchema, mode: z.enum(["create", "update"]) })
+            .parse(input);
+          const existing = diary.days.find((item) => item.date === day.date);
+          if (mode === "create" && existing)
+            fail(
+              409,
+              "Дневник на эту дату уже существует. Откройте его для редактирования.",
+            );
+          if (mode === "update" && !existing)
+            fail(404, "Этот день больше не существует. Обновите дневник.");
+          if (!existing && diary.days.length >= maxDiaryDays)
+            fail(400, "В дневнике может быть не больше 21 дня");
+          diary.days = diary.days.filter((item) => item.date !== day.date);
+          diary.days.push({ ...day, savedAt: new Date().toISOString() });
+          diary.days.sort((a, b) => b.date.localeCompare(a.date));
+          diary.revision++;
+        } else if (endpoint === "workbook/3/day/delete") {
+          const { date } = z.object({ date: diaryDateSchema }).parse(input);
+          if (!diary.days.some((day) => day.date === date))
+            fail(404, "День не найден");
+          diary.days = diary.days.filter((day) => day.date !== date);
+          diary.revision++;
+        } else {
+          if (!reflectionUnlocked(diary.days))
+            fail(400, "Для рефлексии сохраните минимум 7 дней дневника");
+          const { answers, revision } = z
+            .object({
+              answers: diaryReflectionSchema,
+              revision: z.number().int().nonnegative(),
+            })
+            .parse(input);
+          if (revision !== diary.revision)
+            fail(
+              409,
+              "Дневник изменился. Обновите страницу перед сохранением рефлексии.",
+            );
+          diary.reflection = {
+            answers,
+            savedAt: new Date().toISOString(),
+            basedOnRevision: diary.revision,
+          };
+        }
+        return json({ result: diary });
+      }
+      if (endpoint === "workbook/2") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const values = compassSchema.parse(input);
+        const result: CompassResult = {
+          ...values,
+          id: `workbook-2:${user.id}`,
+          studentId: user.id,
+          savedAt: new Date().toISOString(),
+        };
+        db.compassResults = db.compassResults.filter(
+          (item) => item.studentId !== user.id,
+        );
+        db.compassResults.push(result);
+        return json({ result });
+      }
+      if (endpoint === "workbook/1") {
+        if (user.role !== "student")
+          fail(403, "Рабочая тетрадь доступна ученику");
+        const values = workbookSchema.parse(input);
+        const result: WorkbookResult = {
+          ...values,
+          id: `workbook-1:${user.id}`,
+          studentId: user.id,
+          savedAt: new Date().toISOString(),
+        };
+        db.workbookResults = db.workbookResults.filter(
+          (item) => item.studentId !== user.id,
+        );
+        db.workbookResults.push(result);
+        return json({ result });
+      }
       if (endpoint === "assignments") {
         teacher(user);
         const data = assignmentSchema.parse(input);
@@ -496,25 +990,56 @@ export async function handleApi(request: Request, route: string[]) {
         return json(submission);
       }
       if (endpoint === "invites") {
-        teacher(user);
+        if (!canManage(user.role))
+          fail(403, "Приглашать пользователей могут менеджер и администратор");
         const data = z
           .object({
             email: z.union([z.email().max(254), z.literal("")]),
+            role: z.enum(["student", "teacher", "manager"]),
+            workspaceIds: workspaceIdsSchema,
             groupId: z.string().optional(),
           })
           .parse(input);
+        if (!inviteRoles(user.role).includes(data.role))
+          fail(403, "Приглашать менеджеров может только администратор");
+        if (data.role === "manager" && data.workspaceIds.length)
+          fail(400, "Менеджеру не назначаются учебные пространства");
+        if (data.role !== "manager" && !data.workspaceIds.length)
+          fail(400, "Выберите хотя бы одно учебное пространство");
+        if (
+          data.groupId &&
+          (data.role !== "student" || !data.workspaceIds.includes("math"))
+        )
+          fail(400, "Группу можно назначить ученику с доступом к математике");
         if (data.groupId && !db.groups.some((g) => g.id === data.groupId))
           fail(400, "Группа не найдена");
         const token = newToken();
         db.invites.push({
           id: id(),
           tokenHash: tokenHash(token),
-          email: data.email,
+          email: data.email.toLowerCase(),
+          role: data.role,
+          workspaceIds: data.workspaceIds,
           groupId: data.groupId,
           expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
         });
         const base = originFor(request);
         return json({ url: `${base}/?invite=${token}` }, 201);
+      }
+      if (endpoint === "access") {
+        if (!canManage(user.role))
+          fail(403, "Управление доступом доступно менеджеру и администратору");
+        const data = z
+          .object({ userId: nonempty, workspaceIds: workspaceIdsSchema })
+          .strict()
+          .parse(input);
+        const target =
+          db.users.find((item) => item.id === data.userId) ||
+          fail(404, "Пользователь не найден");
+        if (!canManageAccess(target.role))
+          fail(403, "Можно менять доступ только учеников и преподавателей");
+        target.workspaceIds = data.workspaceIds;
+        return json({ user: safeUser(target) });
       }
       if (endpoint === "groups") {
         teacher(user);
@@ -598,6 +1123,8 @@ export async function handleApi(request: Request, route: string[]) {
       return fail(404, "Страница не найдена");
     });
   } catch (error) {
+    if (error instanceof DeepSeekError)
+      return json({ error: error.message }, error.status);
     if (error instanceof HttpError)
       return json({ error: error.message }, error.status);
     if (error instanceof z.ZodError)

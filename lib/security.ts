@@ -5,6 +5,7 @@ import {
   createHash,
 } from "node:crypto";
 import type { Database, User } from "./types";
+import { canTeach, hasWorkspace } from "./access";
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -23,8 +24,8 @@ export const newToken = () => randomBytes(32).toString("base64url");
 export const safeUser = ({ passwordHash: _, ...user }: User) => user;
 export function canReadFile(db: Database, user: User, fileId: string): boolean {
   const file = db.files.find((f) => f.id === fileId);
-  if (!file) return false;
-  if (user.role === "teacher" || file.ownerId === user.id) return true;
+  if (!file || !hasWorkspace(user, "math")) return false;
+  if (canTeach(user.role) || file.ownerId === user.id) return true;
   return (
     db.assignments.some(
       (a) => a.studentIds.includes(user.id) && a.fileIds.includes(fileId),

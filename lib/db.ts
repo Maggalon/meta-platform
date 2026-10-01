@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { createSeed, emptyDatabase } from "./seed";
 import { hashPassword } from "./security";
 import type { Database } from "./types";
+import { migrateAccess } from "./access-migration";
 
 export const isDemo = () =>
   process.env.DEMO_MODE === "true" ||
@@ -20,6 +21,13 @@ const tables: (keyof Database)[] = [
   "invites",
   "sessions",
   "loginAttempts",
+  "workbookResults",
+  "compassResults",
+  "timeDiaries",
+  "mindMaps",
+  "odysseyPlans",
+  "failureEntries",
+  "aiUsage",
 ];
 // Persisted SQL names are retained so a branding change cannot create an empty database.
 export const TABLE_PREFIX = "tochka_";
@@ -49,14 +57,38 @@ function initialDatabase() {
     );
   db.users.push({
     id: "teacher",
-    name: ADMIN_NAME || "Преподаватель",
-    email: ADMIN_EMAIL.toLowerCase(),
+    name: ADMIN_NAME || "Администратор",
+    email: ADMIN_EMAIL.trim().toLowerCase(),
     passwordHash: hashPassword(ADMIN_PASSWORD),
-    role: "teacher",
+    role: "admin",
+    workspaceIds: ["math", "design"],
     color: "green",
     createdAt: new Date().toISOString(),
   });
   return db;
+}
+
+function migrateDatabase(db: Database) {
+  let changed = migrateAccess(
+    db,
+    isDemo() ? undefined : process.env.ADMIN_EMAIL,
+  );
+  if (isDemo() && !db.users.some((user) => user.id === "demo-admin")) {
+    for (const user of createSeed().users.filter((user) =>
+      ["demo-admin", "demo-manager"].includes(user.id),
+    )) {
+      if (
+        !db.users.some(
+          (existing) =>
+            existing.id === user.id || existing.email === user.email,
+        )
+      ) {
+        db.users.push(user);
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }
 
 // One transaction spans validation and the write, preventing duplicate submissions,
@@ -87,8 +119,9 @@ export async function withDb<T>(
       }
       const initialize = db.users.length === 0;
       const active = initialize ? initialDatabase() : db;
+      const migrated = migrateDatabase(active);
       const result = await operation(active);
-      if (write || initialize) {
+      if (write || initialize || migrated) {
         for (const table of tables) {
           const rows = active[table];
           await client.query(
@@ -120,14 +153,18 @@ export async function withDb<T>(
       let db: Database;
       let initialize = false;
       try {
-        db = JSON.parse(await readFile(dataPath, "utf8"));
+        db = {
+          ...emptyDatabase(),
+          ...JSON.parse(await readFile(dataPath, "utf8")),
+        };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
         db = initialDatabase();
         initialize = true;
       }
+      const migrated = migrateDatabase(db);
       const result = await operation(db);
-      if (write || initialize) {
+      if (write || initialize || migrated) {
         await mkdir(path.dirname(dataPath), { recursive: true });
         const temporary = `${dataPath}.${process.pid}.tmp`;
         await writeFile(temporary, JSON.stringify(db, null, 2));

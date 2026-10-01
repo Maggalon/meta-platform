@@ -1,9 +1,19 @@
-export type Role = "teacher" | "student";
+import type { WorkbookResult } from "./workbook";
+import type { CompassResult, AiUsage } from "./compass";
+import type { TimeDiary } from "./diary";
+import type { MindMapResult } from "./mind-map";
+import type { OdysseyResult } from "./odyssey";
+import type { FailureEntry } from "./failure-journal";
+import type { Workspace } from "./workspace";
+
+export type Role = "student" | "teacher" | "manager" | "admin";
+export type InviteRole = Exclude<Role, "admin">;
 export type User = {
   id: string;
   name: string;
   email: string;
   role: Role;
+  workspaceIds: Workspace[];
   passwordHash: string;
   color: string;
   createdAt: string;
@@ -65,6 +75,8 @@ export type Invite = {
   id: string;
   tokenHash: string;
   email: string;
+  role: InviteRole;
+  workspaceIds: Workspace[];
   groupId?: string;
   expiresAt: string;
   usedAt?: string;
@@ -81,6 +93,13 @@ export type Database = {
   invites: Invite[];
   sessions: Session[];
   loginAttempts: LoginAttempt[];
+  workbookResults: WorkbookResult[];
+  compassResults: CompassResult[];
+  timeDiaries: TimeDiary[];
+  mindMaps: MindMapResult[];
+  odysseyPlans: OdysseyResult[];
+  failureEntries: FailureEntry[];
+  aiUsage: AiUsage[];
 };
 export type AppData = {
   user: SafeUser;
@@ -95,9 +114,11 @@ export type AppData = {
 export type View =
   | "overview"
   | "assignments"
+  | "workbook"
   | "review"
   | "students"
   | "groups"
   | "gradebook"
   | "schedule"
+  | "access"
   | "settings";

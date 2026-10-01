@@ -1,0 +1,308 @@
+.compass-workbook {
+  padding-bottom: 48px;
+}
+.compass-intro > svg {
+  flex-shrink: 0;
+  color: #6d805a;
+}
+.compass-spaces {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+.compass-space {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 26px;
+  min-width: 0;
+}
+.compass-space-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.compass-space-heading h2 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+.compass-description {
+  color: var(--workbook-text);
+  font-size: 13px;
+  line-height: 1.7;
+  min-height: 67px;
+}
+.compass-questions {
+  margin: 18px 0 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.compass-questions summary,
+.compass-reread summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.compass-questions summary::-webkit-details-marker,
+.compass-reread summary::-webkit-details-marker {
+  display: none;
+}
+.compass-questions summary svg:last-child,
+.compass-reread summary svg {
+  margin-left: auto;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.compass-questions[open] summary svg:last-child,
+.compass-reread[open] summary svg {
+  transform: rotate(180deg);
+}
+.compass-questions > p {
+  color: var(--workbook-text);
+  line-height: 1.6;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.compass-questions ul {
+  list-style: disc;
+  padding-left: 19px;
+  padding-bottom: 18px;
+}
+.compass-questions li {
+  padding-left: 3px;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 9px;
+}
+.compass-writing > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.compass-workbook textarea {
+  width: 100%;
+  display: block;
+  border: 1px solid #dce1d5;
+  background: #fafbf7;
+  border-radius: 9px;
+  padding: 16px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.8;
+  resize: vertical;
+}
+.compass-writing textarea {
+  min-height: 340px;
+}
+.compass-workbook textarea::placeholder {
+  color: #78826e;
+}
+.compass-word-count {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 13px;
+  font-size: 11px;
+  color: var(--workbook-text);
+}
+.compass-word-count strong {
+  font-weight: 600;
+  color: var(--green);
+}
+.compass-length-note {
+  margin: 17px 0 30px;
+  font-size: 12px;
+  color: var(--workbook-text);
+  line-height: 1.6;
+}
+.compass-alignment {
+  margin-top: 30px;
+  padding: 30px;
+  border: 1px solid #dbe4cb;
+  background: #edf1e5;
+  border-radius: 14px;
+  animation: workbook-appear 0.25s ease-out;
+}
+.compass-alignment-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.compass-alignment-intro h2 {
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  font-size: 23px;
+  margin-bottom: 8px;
+}
+.compass-alignment-intro p {
+  max-width: 730px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--workbook-text);
+}
+.compass-reread {
+  margin-bottom: 22px;
+  border-top: 1px solid #d5dfc8;
+  border-bottom: 1px solid #d5dfc8;
+}
+.compass-reread > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 25px;
+  padding: 7px 0 22px;
+}
+.compass-reread article {
+  min-width: 0;
+}
+.compass-reread h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 9px;
+}
+.compass-reread p {
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--workbook-text);
+}
+.compass-ai-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.compass-ai-tools p {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.compass-ai-tools span {
+  font-size: 11px;
+  color: var(--workbook-text);
+  line-height: 1.7;
+  display: block;
+  max-width: 510px;
+}
+.compass-ai-tools .button {
+  min-height: 44px;
+}
+.compass-ai-status {
+  font-size: 12px;
+  color: var(--workbook-text);
+  line-height: 1.7;
+  margin: 18px 0;
+}
+.compass-alignment-fields {
+  display: grid;
+  gap: 26px;
+}
+.compass-alignment-field > label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.65;
+  margin-bottom: 11px;
+}
+.compass-alignment-field > label > span {
+  color: #73815f;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.compass-alignment-field > textarea {
+  background: #fcfdf9;
+  min-height: 130px;
+}
+.compass-ai-suggestion {
+  margin-top: 12px;
+  padding: 16px 18px;
+  border-left: 2px solid #94a87d;
+  background: #f7f9f2;
+  border-radius: 0 7px 7px 0;
+}
+.compass-ai-suggestion > strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #577042;
+  margin-bottom: 9px;
+}
+.compass-ai-suggestion > p {
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.compass-ai-suggestion .button {
+  margin-top: 13px;
+  min-height: 38px;
+  font-size: 11px;
+}
+.compass-save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 25px 0;
+  margin-top: 5px;
+}
+@media (max-width: 1000px) {
+  .compass-spaces {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compass-description {
+    min-height: auto;
+  }
+}
+@media (max-width: 600px) {
+  .compass-space,
+  .compass-alignment {
+    padding: 22px 17px;
+  }
+  .compass-space-heading h2,
+  .compass-alignment-intro h2 {
+    font-size: 21px;
+  }
+  .compass-reread > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compass-writing textarea {
+    min-height: 300px;
+  }
+  .compass-ai-tools .button {
+    width: 100%;
+  }
+  .compass-workbook textarea {
+    padding: 13px;
+  }
+  .compass-alignment-intro {
+    gap: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compass-alignment {
+    animation: none;
+  }
+  .compass-questions summary svg:last-child,
+  .compass-reread summary svg {
+    transition: none;
+  }
+}

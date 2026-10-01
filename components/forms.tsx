@@ -1,4 +1,5 @@
 "use client";
+import { canTeach, roleNames } from "@/lib/access";
 import { useState } from "react";
 import { lessonIncludesStudent } from "@/lib/lessons";
 import {
@@ -19,7 +20,10 @@ import type {
   Submission,
   Group,
   SafeUser,
+  InviteRole,
 } from "@/lib/types";
+import { allWorkspaces, inviteRoles } from "@/lib/access";
+import { workspaceNames, type Workspace } from "@/lib/workspace";
 import {
   api,
   Avatar,
@@ -207,7 +211,7 @@ export function AssignmentForm({ data, onDone }: FormProps) {
         </div>
         {!students.length && (
           <p className="muted">
-            Сначала пригласите ученика в разделе «Ученики».
+            Попросите менеджера или администратора пригласить ученика.
           </p>
         )}
       </div>
@@ -265,7 +269,7 @@ export function AssignmentDetails({
     [busy, setBusy] = useState(false),
     [uploading, setUploading] = useState(false),
     [error, setError] = useState("");
-  const teacher = data.user.role === "teacher",
+  const teacher = canTeach(data.user.role),
     submission = data.submissions.find(
       (s) => s.assignmentId === a.id && s.studentId === data.user.id,
     );
@@ -452,7 +456,7 @@ export function ReviewForm({
     [error, setError] = useState("");
   const assignment = data.assignments.find((a) => a.id === s.assignmentId)!,
     student = data.users.find((u) => u.id === s.studentId)!;
-  const teacher = data.user.role === "teacher";
+  const teacher = canTeach(data.user.role);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -598,6 +602,8 @@ export function ReviewForm({
   );
 }
 export function InviteForm({ data }: Pick<FormProps, "data">) {
+  const [role, setRole] = useState<InviteRole>("student");
+  const [spaces, setSpaces] = useState<Workspace[]>([...allWorkspaces]);
   const [url, setUrl] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -610,7 +616,12 @@ export function InviteForm({ data }: Pick<FormProps, "data">) {
     try {
       const result = await api<{ url: string }>("invites", {
         email: f.get("email") || "",
-        groupId: f.get("groupId") || undefined,
+        role,
+        workspaceIds: role === "manager" ? [] : spaces,
+        groupId:
+          role === "student" && spaces.includes("math")
+            ? f.get("groupId") || undefined
+            : undefined,
       });
       setUrl(result.url);
     } catch (e) {
@@ -634,10 +645,12 @@ export function InviteForm({ data }: Pick<FormProps, "data">) {
       <div className="invite-symbol">
         <Link2 size={31} />
       </div>
-      <h3>Первый шаг к большим результатам</h3>
+      <h3>Приглашение готово</h3>
       <p>
-        Передайте ссылку ученику. По ней он создаст аккаунт и получит доступ к
-        платформе.
+        Роль: {roleNames[role]}.{" "}
+        {role !== "manager" &&
+          `Пространства: ${spaces.map((space) => workspaceNames[space]).join(", ")}.`}{" "}
+        Передайте ссылку пользователю — он самостоятельно задаст пароль.
       </p>
       <label>
         Персональная пригласительная ссылка
@@ -647,7 +660,17 @@ export function InviteForm({ data }: Pick<FormProps, "data">) {
         {copied ? <Check size={16} /> : <Copy size={16} />}{" "}
         {copied ? "Ссылка скопирована" : "Скопировать ссылку"}
       </button>
-      <small>Одно приглашение — один ученик. Срок действия: 7 дней.</small>
+      <small>Одно приглашение — один аккаунт. Срок действия: 7 дней.</small>
+      <button
+        className="button secondary"
+        onClick={() => {
+          setUrl("");
+          setCopied(false);
+          setError("");
+        }}
+      >
+        Создать ещё приглашение
+      </button>
       {error && <p className="form-error">{error}</p>}
     </div>
   ) : (
@@ -655,26 +678,72 @@ export function InviteForm({ data }: Pick<FormProps, "data">) {
       <div className="soft-notice">
         <Users size={23} />
         <p>
-          Вход на платформу — только по вашему приглашению. Ученик сам задаст
+          Вход на платформу — только по приглашению. Пользователь сам задаст
           пароль при регистрации.
         </p>
       </div>
       <label>
-        Email ученика <span className="optional">необязательно</span>
-        <input type="email" name="email" placeholder="student@example.ru" />
-        <small>Регистрация будет доступна только с указанным email.</small>
-      </label>
-      <label>
-        Добавить в группу
-        <select name="groupId">
-          <option value="">Без группы</option>
-          {data.groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
+        Роль
+        <select
+          value={role}
+          disabled={busy}
+          onChange={(event) => setRole(event.target.value as InviteRole)}
+        >
+          {inviteRoles(data.user.role).map((value) => (
+            <option value={value} key={value}>
+              {roleNames[value]}
             </option>
           ))}
         </select>
       </label>
+      {role !== "manager" && (
+        <fieldset className="workspace-choices">
+          <legend>Учебные пространства</legend>
+          {allWorkspaces.map((space) => (
+            <label key={space}>
+              <input
+                type="checkbox"
+                checked={spaces.includes(space)}
+                disabled={busy}
+                onChange={(event) =>
+                  setSpaces(
+                    event.target.checked
+                      ? [...spaces, space]
+                      : spaces.filter((value) => value !== space),
+                  )
+                }
+              />
+              {workspaceNames[space]}
+            </label>
+          ))}
+          <small>
+            Выберите хотя бы одно. Доступ можно изменить после регистрации.
+          </small>
+        </fieldset>
+      )}
+      <label>
+        Email <span className="optional">необязательно</span>
+        <input
+          type="email"
+          name="email"
+          placeholder="name@example.ru"
+          disabled={busy}
+        />
+        <small>Регистрация будет доступна только с указанным email.</small>
+      </label>
+      {role === "student" && spaces.includes("math") && (
+        <label>
+          Добавить в группу
+          <select name="groupId" disabled={busy}>
+            <option value="">Без группы</option>
+            {data.groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -847,7 +916,7 @@ export function LessonForm({ data, onDone }: FormProps) {
           </select>
           {!students.length && (
             <span className="muted">
-              Сначала пригласите ученика в разделе «Ученики».
+              Попросите менеджера или администратора пригласить ученика.
             </span>
           )}
         </label>

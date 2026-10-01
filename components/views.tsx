@@ -1,4 +1,5 @@
 "use client";
+import { canTeach, roleNames } from "@/lib/access";
 import { useMemo, useState } from "react";
 import { lessonIncludesStudent, lessonParticipants } from "@/lib/lessons";
 import {
@@ -48,7 +49,7 @@ export function AssignmentsView({
   const [filter, setFilter] = useState("all"),
     [group, setGroup] = useState("all"),
     [sort, setSort] = useState("deadline");
-  const teacher = data.user.role === "teacher";
+  const teacher = canTeach(data.user.role);
   const status = (a: Assignment) =>
     data.submissions.find(
       (s) => s.assignmentId === a.id && s.studentId === data.user.id,
@@ -229,7 +230,7 @@ export function ReviewView({
   const [filter, setFilter] = useState("pending"),
     [sort, setSort] = useState("oldest"),
     [assignment, setAssignment] = useState("all");
-  const teacher = data.user.role === "teacher";
+  const teacher = canTeach(data.user.role);
   const rows = data.submissions
     .filter(
       (s) =>
@@ -394,7 +395,7 @@ export function StudentsView({
   query,
   onInvite,
   onStudent,
-}: { onInvite: () => void; onStudent: (u: SafeUser) => void } & Shared) {
+}: { onInvite?: () => void; onStudent: (u: SafeUser) => void } & Shared) {
   const [group, setGroup] = useState("all");
   const students = data.users.filter(
     (u) =>
@@ -422,10 +423,12 @@ export function StudentsView({
               </option>
             ))}
           </select>
-          <button className="button secondary" onClick={onInvite}>
-            <Plus size={17} />
-            Пригласить ученика
-          </button>
+          {onInvite && (
+            <button className="button secondary" onClick={onInvite}>
+              <Plus size={17} />
+              Пригласить ученика
+            </button>
+          )}
         </div>
       </div>
       <section className="panel full-table">
@@ -550,11 +553,17 @@ export function StudentsView({
         {!students.length && (
           <EmptyState
             title="Здесь будут ваши ученики"
-            description="Отправьте пригласительную ссылку, чтобы начать."
+            description={
+              onInvite
+                ? "Отправьте пригласительную ссылку, чтобы начать."
+                : "Менеджер или администратор может пригласить учеников и открыть им доступ."
+            }
             action={
-              <button className="button primary" onClick={onInvite}>
-                Создать приглашение
-              </button>
+              onInvite && (
+                <button className="button primary" onClick={onInvite}>
+                  Создать приглашение
+                </button>
+              )
             }
           />
         )}
@@ -724,7 +733,7 @@ export function ClassGradebookView({
           </span>
         </div>
         <div className="filter-controls">
-          {data.user.role === "teacher" && (
+          {canTeach(data.user.role) && (
             <select
               aria-label="Группа в журнале"
               value={group}
@@ -971,7 +980,7 @@ export function ScheduleView({
           );
         })}
       </div>
-      {data.user.role === "teacher" && (
+      {canTeach(data.user.role) && (
         <button className="add-lesson-footer" onClick={onCreate}>
           <Plus size={17} />
           Запланировать занятие
@@ -1021,7 +1030,7 @@ export function SettingsView({
         <Avatar user={data.user} size="large" />
         <div>
           <h2>{data.user.name}</h2>
-          <p>{data.user.role === "teacher" ? "Преподаватель" : "Ученик"}</p>
+          <p>{roleNames[data.user.role]}</p>
         </div>
       </div>
       <form onSubmit={submit} className="standard-form">

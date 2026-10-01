@@ -1,0 +1,420 @@
+.map-workbook {
+  padding-bottom: 48px;
+}
+.map-workbook input,
+.map-workbook textarea,
+.map-workbook select {
+  width: 100%;
+  border: 1px solid #d8dfce;
+  background: #fcfdf9;
+  color: var(--ink);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 12px 14px;
+}
+.map-workbook textarea {
+  resize: vertical;
+}
+.map-workbook label {
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.map-workbook input:focus,
+.map-workbook textarea:focus,
+.map-workbook select:focus {
+  outline: 2px solid #98ac80;
+  outline-offset: 2px;
+}
+.map-step {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: #6d805c;
+  margin-bottom: 13px;
+}
+.map-core-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 40px;
+  background: #edf1e5;
+  border: 1px solid #dce4ce;
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 38px;
+}
+.map-core-panel h2,
+.map-section-heading h2,
+.map-combination h2 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+.map-core-panel p,
+.map-combination > p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--workbook-text);
+}
+.map-core-panel label {
+  display: block;
+  margin-bottom: 9px;
+}
+.map-source-label {
+  margin-top: 17px;
+}
+.map-source-label select {
+  margin-top: 8px;
+}
+.map-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--workbook-text);
+  margin: 12px 0;
+}
+.map-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+  margin: 30px 0 18px;
+}
+.map-section-heading > span {
+  color: var(--workbook-text);
+  font-size: 11px;
+  margin-bottom: 13px;
+  flex-shrink: 0;
+}
+.map-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(270px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.map-canvas-shell {
+  border: 1px solid #dbe2d3;
+  background: #fafbf6;
+  border-radius: 14px;
+  overflow: hidden;
+  min-width: 0;
+}
+.map-canvas-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #e2e7db;
+  padding: 13px 16px;
+}
+.map-canvas-tools > span {
+  font-size: 11px;
+  color: var(--workbook-text);
+}
+.map-canvas-tools > div {
+  display: flex;
+  gap: 3px;
+}
+.map-canvas {
+  height: 590px;
+  background-image: radial-gradient(#dce3d4 1px, transparent 1px);
+  background-size: 20px 20px;
+  touch-action: none;
+  cursor: grab;
+}
+.map-canvas:active {
+  cursor: grabbing;
+}
+.map-canvas svg {
+  display: block;
+}
+.map-node {
+  cursor: pointer;
+  outline: none;
+}
+.map-node:focus-visible circle {
+  stroke: #183d2a;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 2;
+}
+.map-canvas-help {
+  font-size: 10px;
+  color: var(--workbook-text);
+  line-height: 1.7;
+  padding: 13px 16px;
+  border-top: 1px solid #e2e7db;
+}
+.map-editor {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  max-height: 741px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.map-editor h3 {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 19px 0 15px;
+}
+.map-branch-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.map-branch-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 33px;
+  height: 33px;
+  border: 1px solid #dde4d4;
+  border-radius: 50%;
+  background: #fff;
+  color: #526743;
+  font-size: 12px;
+  cursor: pointer;
+}
+.map-branch-tabs button.active {
+  background: #304e3d;
+  color: #fff;
+  border-color: #304e3d;
+}
+.map-branch-tabs button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.map-word-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 12px 0;
+}
+.map-word-field > span {
+  font-size: 10px;
+  color: #6a7c5f;
+}
+.map-word-field.active input {
+  border-color: #72885e;
+}
+.map-twig {
+  border-top: 1px solid #e3e8db;
+  padding: 9px 0 18px;
+}
+.map-twig > div {
+  border-left: 1px solid #cbd7be;
+  margin-left: 6px;
+  padding-left: 15px;
+}
+.map-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  font: inherit;
+  font-size: 11px;
+  color: #4b6840;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.map-text-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.map-editor-start p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--workbook-text);
+  margin: 15px 0 24px;
+}
+.map-combination {
+  margin-top: 30px;
+  border: 1px dashed #cbd7bc;
+  border-radius: 14px;
+  padding: 28px;
+}
+.map-combination.ready {
+  background: #f0f3e7;
+  border-style: solid;
+}
+.map-combination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.map-combination-actions [aria-pressed="true"] {
+  background: #dee8c6;
+}
+.map-selected-words,
+.map-idea-words {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 22px 0;
+}
+.map-selected-words > span,
+.map-idea-words > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 22px;
+  background: #e1e9cf;
+  padding: 10px 17px;
+  color: #385039;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.map-selected-words button {
+  display: flex;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  color: inherit;
+}
+.map-word-list summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 10px 0;
+}
+.map-word-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+.map-word-list button {
+  border: 1px solid #d3ddc7;
+  background: #fff;
+  border-radius: 20px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #49603b;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.map-word-list button.selected {
+  background: #dbe8ad;
+  border-color: #819a65;
+}
+.map-ideas {
+  margin-top: 38px;
+}
+.map-idea {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  margin-top: 20px;
+}
+.map-idea-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.map-idea-heading > span {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: #6d805c;
+}
+.map-idea-core {
+  font-size: 12px;
+  color: var(--workbook-text);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  margin-top: 12px;
+}
+.map-idea > label {
+  display: block;
+  margin: 20px 0 9px;
+}
+.map-idea-ai {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin: 24px 0 8px;
+}
+.map-idea-ai p {
+  font-size: 11px;
+  color: var(--workbook-text);
+  line-height: 1.8;
+  max-width: 420px;
+}
+.map-idea .compass-ai-suggestion h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.map-save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-top: 26px;
+  padding: 20px 0;
+}
+.map-save-bar > p {
+  font-size: 12px;
+  color: var(--workbook-text);
+}
+.map-save-bar > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .map-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .map-editor {
+    max-height: 650px;
+  }
+  .map-canvas {
+    height: 510px;
+  }
+}
+@media (max-width: 650px) {
+  .map-core-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 22px 17px;
+  }
+  .map-section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 0;
+  }
+  .map-canvas {
+    height: 420px;
+  }
+  .map-combination,
+  .map-idea {
+    padding: 22px 17px;
+  }
+  .map-combination-actions > .button,
+  .map-save-bar > div,
+  .map-save-bar .button {
+    width: 100%;
+  }
+  .map-idea-ai .button {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-workbook * {
+    scroll-behavior: auto !important;
+  }
+}

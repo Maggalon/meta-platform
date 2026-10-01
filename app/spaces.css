@@ -1,0 +1,103 @@
+.workspace-picker {
+  position: relative;
+  margin-bottom: 31px;
+}
+.workspace-picker .workspace-switch {
+  margin-bottom: 0;
+}
+.workspace-picker .workspace-switch > span:nth-child(2) {
+  min-width: 0;
+}
+.workspace-picker .workspace-switch strong {
+  overflow-wrap: anywhere;
+}
+.workspace-picker .workspace-icon,
+.workspace-picker .workspace-switch > svg {
+  flex-shrink: 0;
+}
+.workspace-options {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 7px);
+  z-index: 30;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #d9e1d0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #14271d26;
+}
+.workspace-options button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 8px;
+  border-radius: 7px;
+  text-align: left;
+  color: #34513a;
+  font: inherit;
+  font-size: 12px;
+}
+.workspace-options button span {
+  flex: 1;
+}
+.workspace-options button[aria-pressed="true"],
+.workspace-options button:hover {
+  background: #edf2e6;
+}
+.workspace-options button:focus-visible,
+.workspace-picker > button:focus-visible {
+  outline: 2px solid #9caf8d;
+  outline-offset: 2px;
+}
+.design-home {
+  padding: 26px;
+}
+.design-home > p {
+  max-width: 700px;
+  color: #58644f;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+.design-blocks {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  margin: 0;
+  gap: 12px;
+}
+.design-blocks a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  height: 100%;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.design-blocks a:hover {
+  background: #f3f6ec;
+  border-color: #9baa80;
+}
+.design-blocks a > span {
+  color: #647556;
+  font-size: 12px;
+}
+.design-blocks a > strong {
+  flex: 1;
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .design-blocks {
+    grid-template-columns: 1fr;
+  }
+  .design-home {
+    padding: 20px;
+  }
+}

@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { api, Logo } from "./ui";
+import { roleNames } from "@/lib/access";
+import type { InviteRole, Role } from "@/lib/types";
+import { workspaceNames, type Workspace } from "@/lib/workspace";
 
 export default function AuthScreen({
   invite,
@@ -18,13 +21,18 @@ export default function AuthScreen({
     [invitation, setInvitation] = useState<{
       email: string;
       group?: string;
+      role: InviteRole;
+      workspaceIds: Workspace[];
     } | null>(null),
     [validating, setValidating] = useState(!!invite);
   useEffect(() => {
     if (invite) {
-      api<{ email: string; group?: string }>(
-        `auth/invite?token=${encodeURIComponent(invite)}`,
-      )
+      api<{
+        email: string;
+        group?: string;
+        role: InviteRole;
+        workspaceIds: Workspace[];
+      }>(`auth/invite?token=${encodeURIComponent(invite)}`)
         .then(setInvitation)
         .catch((e) => setError(e.message))
         .finally(() => setValidating(false));
@@ -49,7 +57,7 @@ export default function AuthScreen({
       setBusy(false);
     }
   }
-  async function demoLogin(role: "teacher" | "student") {
+  async function demoLogin(role: Role) {
     setBusy(true);
     setError("");
     try {
@@ -96,9 +104,16 @@ export default function AuthScreen({
             {invite
               ? invitation?.group
                 ? `Вас пригласили в группу «${invitation.group}»`
-                : "Создайте аккаунт и начните подготовку к ЕГЭ."
+                : "Создайте аккаунт, чтобы присоединиться к платформе."
               : "Войдите, чтобы продолжить с того места, где остановились."}
           </p>
+          {invite && invitation && (
+            <p>
+              Ваша роль: {roleNames[invitation.role]}.
+              {invitation.workspaceIds.length > 0 &&
+                ` Пространства: ${invitation.workspaceIds.map((space) => workspaceNames[space]).join(", ")}.`}
+            </p>
+          )}
           {validating ? (
             <div className="loading-inline">
               <LoaderCircle className="spin" />
@@ -176,8 +191,8 @@ export default function AuthScreen({
           )}
           {!invite && (
             <p className="auth-invite-note">
-              Впервые здесь? Получите пригласительную ссылку у своего
-              преподавателя.
+              Впервые здесь? Получите пригласительную ссылку у менеджера или
+              администратора.
             </p>
           )}
           {demo && !invite && (
@@ -190,6 +205,14 @@ export default function AuthScreen({
                 </button>
                 <button onClick={() => demoLogin("student")} disabled={busy}>
                   Я ученик
+                  <ArrowUpRightIcon />
+                </button>
+                <button onClick={() => demoLogin("manager")} disabled={busy}>
+                  Я менеджер
+                  <ArrowUpRightIcon />
+                </button>
+                <button onClick={() => demoLogin("admin")} disabled={busy}>
+                  Я администратор
                   <ArrowUpRightIcon />
                 </button>
               </div>

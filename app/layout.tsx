@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./readability.css";
+import "./workbook.css";
+import "./compass.css";
+import "./diary.css";
+import "./mind-map.css";
+import "./odyssey.css";
+import "./failure-journal.css";
+import "./spaces.css";
+import "./access.css";
 export const metadata: Metadata = {
   title: "Meta Education — пространство для роста",
   description:

@@ -1,4 +1,5 @@
 "use client";
+import { canTeach } from "@/lib/access";
 import { useRef, useState } from "react";
 import { lessonIncludesStudent, lessonParticipants } from "@/lib/lessons";
 import gsap from "gsap";
@@ -44,7 +45,7 @@ export default function Overview({
   openLesson,
 }: Props) {
   const root = useRef<HTMLDivElement>(null);
-  const teacher = data.user.role === "teacher";
+  const teacher = canTeach(data.user.role);
   const students = data.users.filter((u) => u.role === "student");
   const pending = data.submissions
     .filter((s) => s.status === "pending")
@@ -285,7 +286,7 @@ export default function Overview({
                 <p>{feedback.feedback}</p>
                 <div className="feedback-author">
                   <Avatar
-                    user={data.users.find((u) => u.role === "teacher")!}
+                    user={data.users.find((u) => canTeach(u.role))!}
                     size="small"
                   />
                   <span>Ваш преподаватель</span>

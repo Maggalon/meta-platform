@@ -1,4 +1,5 @@
 "use client";
+import { canTeach } from "@/lib/access";
 
 import { useState } from "react";
 import { ArrowUpRight, Download } from "lucide-react";
@@ -20,7 +21,7 @@ type Props = {
 
 export function GradebookView(props: Props) {
   const { data, query, onReview, onAssignment } = props;
-  const teacher = data.user.role === "teacher";
+  const teacher = canTeach(data.user.role);
   const [mode, setMode] = useState<"individual" | "class">("individual");
   const [studentId, setStudentId] = useState("");
   const [group, setGroup] = useState("all");
@@ -193,7 +194,7 @@ export function GradebookView(props: Props) {
             <section className="panel">
               <EmptyState
                 title="Ученики не найдены"
-                description="Измените поиск или выберите другую группу. Если учеников ещё нет, пригласите их в разделе «Ученики»."
+                description="Измените поиск или выберите другую группу. Если учеников ещё нет, попросите менеджера или администратора пригласить их."
               />
             </section>
           ) : (

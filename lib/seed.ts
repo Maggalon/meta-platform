@@ -12,6 +12,13 @@ export function emptyDatabase(): Database {
     invites: [],
     sessions: [],
     loginAttempts: [],
+    workbookResults: [],
+    compassResults: [],
+    timeDiaries: [],
+    mindMaps: [],
+    odysseyPlans: [],
+    failureEntries: [],
+    aiUsage: [],
   };
 }
 export function createSeed(): Database {
@@ -30,6 +37,7 @@ export function createSeed(): Database {
       name: "Анна Сергеевна",
       email: "teacher@meta-education.demo",
       role: "teacher",
+      workspaceIds: ["math", "design"],
       passwordHash,
       color: "green",
       createdAt: date(-90),
@@ -48,11 +56,34 @@ export function createSeed(): Database {
       name,
       email: `${login}@meta-education.demo`,
       role: "student" as const,
+      workspaceIds: ["math", "design"] as ("math" | "design")[],
       passwordHash,
       color,
       createdAt: date(-70 + i),
     })),
   ];
+  db.users.push(
+    {
+      id: "demo-manager",
+      name: "Мария · Менеджер",
+      email: "manager@meta-education.demo",
+      role: "manager",
+      workspaceIds: [],
+      passwordHash,
+      color: "blue",
+      createdAt: date(-90),
+    },
+    {
+      id: "demo-admin",
+      name: "Алексей · Администратор",
+      email: "admin@meta-education.demo",
+      role: "admin",
+      workspaceIds: ["math", "design"],
+      passwordHash,
+      color: "purple",
+      createdAt: date(-90),
+    },
+  );
   db.groups = [
     {
       id: "group-1",

@@ -48,6 +48,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env.production}
       S3_FORCE_PATH_STYLE: "false"
       TRUST_PROXY: ${TRUST_PROXY:-true}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
     depends_on:
       postgres:
         condition: service_healthy

@@ -11,6 +11,9 @@ import {
 } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
 import type { AppData, Assignment, Submission } from "../lib/types";
+import { emptyMindMap, randomOuterWords } from "../lib/mind-map";
+import { emptyOdyssey, newOdysseyEvent } from "../lib/odyssey";
+import { randomUUID } from "node:crypto";
 
 const base = "http://localhost:3100",
   run = Date.now().toString();
@@ -54,8 +57,1057 @@ class Client {
   }
 }
 const teacher = new Client(),
+  manager = new Client(),
   student = new Client(),
   stranger = new Client();
+
+test("four roles enforce invitations, workspace access and existing-session revocation", async () => {
+  const admin = new Client(),
+    manager = new Client(),
+    teacher = new Client(),
+    pupil = new Client();
+  for (const [client, role] of [
+    [admin, "admin"],
+    [manager, "manager"],
+    [teacher, "teacher"],
+    [pupil, "student"],
+  ] as const)
+    assert.equal(
+      (await client.request("auth/demo", { role })).response.status,
+      200,
+    );
+  const invitation = {
+    email: "",
+    role: "student",
+    workspaceIds: ["math", "design"],
+  };
+  const pupilInvite = await manager.request("invites", invitation);
+  const registeredPupil = await pupil.request("auth/register", {
+    email: `pupil-access-${run}@example.test`,
+    name: "Ученик для проверки доступа",
+    password: "AccessTestPassword2026!",
+    token: new URL(pupilInvite.data.url).searchParams.get("invite"),
+  });
+  assert.equal(registeredPupil.response.status, 201);
+  const pupilId = registeredPupil.data.user.id as string;
+  for (const client of [pupil, teacher]) {
+    assert.equal(
+      (await client.request("invites", invitation)).response.status,
+      403,
+    );
+    assert.equal(
+      (await client.request("access", { userId: pupilId, workspaceIds: [] }))
+        .response.status,
+      403,
+    );
+  }
+  for (const endpoint of [
+    "assignments",
+    "assignments/archive",
+    "groups",
+    "lessons",
+    "reviews",
+    "submissions",
+    "files",
+  ])
+    assert.equal(
+      (await manager.request(endpoint, {})).response.status,
+      403,
+      endpoint,
+    );
+  const managerData = (await manager.request("data")).data as AppData;
+  assert.ok(managerData.users.some((user) => user.role === "teacher"));
+  for (const collection of [
+    managerData.assignments,
+    managerData.submissions,
+    managerData.files,
+    managerData.lessons,
+  ])
+    assert.deepEqual(collection, []);
+  assert.equal(
+    (
+      await manager.request("invites", {
+        ...invitation,
+        role: "manager",
+        workspaceIds: [],
+      })
+    ).response.status,
+    403,
+  );
+  assert.equal(
+    (await admin.request("invites", { ...invitation, role: "admin" })).response
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await manager.request("invites", {
+        ...invitation,
+        workspaceIds: ["unknown"],
+      })
+    ).response.status,
+    400,
+  );
+  assert.equal(
+    (await manager.request("invites", { ...invitation, workspaceIds: [] }))
+      .response.status,
+    400,
+  );
+  assert.equal(
+    (
+      await admin.request("invites", {
+        ...invitation,
+        role: "manager",
+        groupId: "group-1",
+        workspaceIds: [],
+      })
+    ).response.status,
+    400,
+  );
+  for (const [issuer, role, workspaceIds] of [
+    [manager, "teacher", ["design"]],
+    [admin, "manager", []],
+    [manager, "student", ["design"]],
+  ] as const) {
+    const issued = await issuer.request("invites", {
+      email: "",
+      role,
+      workspaceIds,
+    });
+    assert.equal(issued.response.status, 201);
+    const token = new URL(issued.data.url).searchParams.get("invite");
+    const recipient = new Client();
+    const preview = await recipient.request(`auth/invite?token=${token}`);
+    assert.equal(preview.data.role, role);
+    assert.deepEqual(preview.data.workspaceIds, workspaceIds);
+    const registration = await recipient.request("auth/register", {
+      email: `${role}-access-${run}@example.test`,
+      name: `Новый ${role}`,
+      password: "AccessTestPassword2026!",
+      token,
+      role: "admin",
+      workspaceIds: ["math", "design"],
+    });
+    assert.equal(registration.response.status, 201);
+    assert.equal(registration.data.user.role, role);
+    assert.deepEqual(registration.data.user.workspaceIds, workspaceIds);
+    assert.equal(
+      (
+        await recipient.request("auth/register", {
+          email: `replay-${role}@example.test`,
+          name: "Повтор",
+          password: "AccessTestPassword2026!",
+          token,
+        })
+      ).response.status,
+      400,
+    );
+    if (role === "teacher") {
+      assert.equal(
+        (await recipient.request("assignments", {})).response.status,
+        403,
+      );
+      assert.equal(
+        (await recipient.request("data")).data.assignments.length,
+        0,
+      );
+      assert.equal(
+        (
+          await manager.request("access", {
+            userId: registration.data.user.id,
+            workspaceIds: ["math", "design"],
+          })
+        ).response.status,
+        200,
+      );
+      assert.ok((await recipient.request("data")).data.assignments.length > 0);
+    }
+  }
+  for (const userId of ["demo-admin", "demo-manager"])
+    assert.equal(
+      (await manager.request("access", { userId, workspaceIds: [] })).response
+        .status,
+      403,
+    );
+  assert.equal(
+    (
+      await manager.request("access", {
+        userId: pupilId,
+        workspaceIds: ["math"],
+        role: "admin",
+      })
+    ).response.status,
+    400,
+  );
+  assert.equal(
+    (
+      await admin.request("access", {
+        userId: "teacher",
+        workspaceIds: ["design"],
+      })
+    ).response.status,
+    200,
+  );
+  assert.equal((await teacher.request("groups", {})).response.status, 403);
+  assert.equal(
+    (
+      await admin.request("access", {
+        userId: "teacher",
+        workspaceIds: ["math", "design"],
+      })
+    ).response.status,
+    200,
+  );
+  const group = await admin.request("groups", {
+    name: "Администратор преподаёт",
+    description: "",
+    studentIds: [],
+  });
+  assert.equal(group.response.status, 201);
+  const assignment = await admin.request("assignments", {
+    title: "Задание администратора",
+    description: "Ответьте на вопрос",
+    deadline: new Date(Date.now() + 86400000).toISOString(),
+    studentIds: [pupilId],
+    maxScore: 10,
+  });
+  assert.equal(assignment.response.status, 201);
+  const submission = await pupil.request("submissions", {
+    assignmentId: assignment.data.id,
+    answers: "Ответ",
+    fileIds: [],
+  });
+  assert.equal(submission.response.status, 201);
+  assert.equal(
+    (
+      await admin.request("reviews", {
+        submissionId: submission.data.id,
+        score: 9,
+        feedback: "Проверено администратором",
+        fileIds: [],
+      })
+    ).response.status,
+    200,
+  );
+  assert.equal((await admin.request("workbook/1")).response.status, 403);
+  const saved = await pupil.request("workbook/2", {
+    work: "Сохранить при закрытии",
+    life: "",
+    alignment: { complement: "", conflict: "", direction: "" },
+    timeZone: "Europe/Moscow",
+    status: "draft",
+  });
+  assert.equal(saved.response.status, 200);
+  assert.equal(
+    (
+      await manager.request("access", {
+        userId: pupilId,
+        workspaceIds: ["math"],
+      })
+    ).response.status,
+    200,
+  );
+  for (const endpoint of [
+    "workbook/1",
+    "workbook/1/pdf",
+    "workbook/2",
+    "workbook/2/pdf",
+    "workbook/3",
+    "workbook/4",
+    "workbook/4/pdf",
+    "workbook/5",
+    "workbook/6",
+  ])
+    assert.equal(
+      (await pupil.request(endpoint)).response.status,
+      403,
+      endpoint,
+    );
+  for (const endpoint of [
+    "workbook/1",
+    "workbook/2",
+    "workbook/3",
+    "workbook/4",
+    "workbook/5",
+    "workbook/6",
+    "workbook/6/delete",
+    "workbook/2/analyze",
+    "workbook/3/analyze",
+    "workbook/4/analyze",
+  ])
+    assert.equal(
+      (await pupil.request(endpoint, { ideaId: "test" })).response.status,
+      403,
+      endpoint,
+    );
+  assert.equal(
+    (
+      await manager.request("access", {
+        userId: pupilId,
+        workspaceIds: ["math", "design"],
+      })
+    ).response.status,
+    200,
+  );
+  assert.equal(
+    (await pupil.request("workbook/2")).data.result.work,
+    "Сохранить при закрытии",
+  );
+  const form = new FormData();
+  form.set("kind", "submission");
+  form.set(
+    "file",
+    new Blob(["%PDF-1.4\naccess"], { type: "application/pdf" }),
+    "private.pdf",
+  );
+  const file = await pupil.request("files", form);
+  assert.equal(file.response.status, 201);
+  assert.equal(
+    (await manager.request(`files/${file.data.id}`)).response.status,
+    403,
+  );
+  assert.equal(
+    (await manager.request("access", { userId: pupilId, workspaceIds: [] }))
+      .response.status,
+    200,
+  );
+  const closed = (await pupil.request("data")).data as AppData;
+  assert.deepEqual(closed.user.workspaceIds, []);
+  for (const collection of [
+    closed.groups,
+    closed.assignments,
+    closed.submissions,
+    closed.files,
+    closed.lessons,
+  ])
+    assert.deepEqual(collection, []);
+  assert.equal(
+    (await pupil.request(`files/${file.data.id}`)).response.status,
+    403,
+  );
+  assert.equal((await pupil.request("files", form)).response.status, 403);
+  assert.equal((await pupil.request("submissions", {})).response.status, 403);
+  assert.equal(
+    (
+      await manager.request("access", {
+        userId: pupilId,
+        workspaceIds: ["math", "design"],
+      })
+    ).response.status,
+    200,
+  );
+  assert.equal(
+    (await pupil.request(`files/${file.data.id}`, undefined, { raw: true }))
+      .response.status,
+    200,
+  );
+});
+
+test("workbook saves only complete personal results and exports the saved version", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  const input = {
+    answers: {
+      health: { score: 0, explanation: "Хочу наладить сон." },
+      work: { score: 25, explanation: "Учёба требует внимания." },
+      hobbies: { score: 75, explanation: "Нравится рисовать." },
+      love: { score: 100, explanation: "Близкие поддерживают." },
+    },
+    priority: "health",
+    timeZone: "Asia/Vladivostok",
+  };
+  assert.equal((await anonymous.request("workbook/1")).response.status, 401);
+  assert.equal(
+    (await anonymous.request("workbook/1", input)).response.status,
+    401,
+  );
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  assert.equal((await admin.request("workbook/1")).response.status, 403);
+  assert.equal((await admin.request("workbook/1", input)).response.status, 403);
+  assert.equal((await owner.request("workbook/1")).data.result, null);
+  assert.equal((await owner.request("workbook/1/pdf")).response.status, 404);
+  assert.equal(
+    (await owner.request("workbook/1", { ...input, priority: "" })).response
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await owner.request("workbook/1", {
+        ...input,
+        answers: {
+          ...input.answers,
+          health: { score: null, explanation: "Причина" },
+        },
+      })
+    ).response.status,
+    400,
+  );
+  const response = await owner.request("workbook/1", {
+    ...input,
+    studentId: "student-2",
+    savedAt: "2000-01-01",
+  });
+  assert.equal(response.response.status, 200);
+  assert.equal(response.data.result.studentId, "student-1");
+  assert.ok(Date.now() - Date.parse(response.data.result.savedAt) < 60000);
+  const restored = await owner.request("workbook/1");
+  assert.deepEqual(restored.data.result.answers, input.answers);
+  assert.equal((await other.request("workbook/1")).data.result, null);
+  assert.equal((await other.request("workbook/1/pdf")).response.status, 404);
+  assert.equal((await admin.request("workbook/1/pdf")).response.status, 403);
+  const pdf = await owner.request("workbook/1/pdf", undefined, { raw: true });
+  assert.equal(pdf.response.status, 200);
+  assert.equal(pdf.response.headers.get("content-type"), "application/pdf");
+  assert.equal(
+    Buffer.from(await pdf.response.arrayBuffer())
+      .subarray(0, 4)
+      .toString(),
+    "%PDF",
+  );
+  input.answers.health.score = 50;
+  await owner.request("workbook/1", input);
+  assert.equal(
+    (await owner.request("workbook/1")).data.result.answers.health.score,
+    50,
+  );
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(
+      "Хочу наладить сон",
+    ),
+    false,
+  );
+});
+test("compass persists drafts and completed answers privately without enforcing 250 words", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  const input = {
+    work: "Для меня работа имеет смысл.",
+    life: "",
+    alignment: { complement: "", conflict: "", direction: "" },
+    timeZone: "Asia/Vladivostok",
+    status: "draft",
+  };
+  assert.equal((await anonymous.request("workbook/2")).response.status, 401);
+  assert.equal(
+    (await anonymous.request("workbook/2", input)).response.status,
+    401,
+  );
+  assert.equal(
+    (
+      await anonymous.request("workbook/2/analyze", {
+        work: "Работа",
+        life: "Жизнь",
+      })
+    ).response.status,
+    401,
+  );
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  const initial = await owner.request("workbook/2");
+  assert.equal(initial.data.result, null);
+  assert.equal(initial.data.aiAvailable, false);
+  assert.equal((await owner.request("workbook/2/pdf")).response.status, 404);
+  assert.equal(
+    (await anonymous.request("workbook/2/pdf")).response.status,
+    401,
+  );
+  assert.equal((await admin.request("workbook/2/pdf")).response.status, 403);
+  assert.equal((await admin.request("workbook/2")).response.status, 403);
+  assert.equal((await admin.request("workbook/2", input)).response.status, 403);
+  assert.equal(
+    (
+      await admin.request("workbook/2/analyze", {
+        work: "Работа",
+        life: "Жизнь",
+      })
+    ).response.status,
+    403,
+  );
+  assert.equal(
+    (await owner.request("workbook/2", { ...input, status: "completed" }))
+      .response.status,
+    400,
+  );
+  assert.equal(
+    (
+      await owner.request("workbook/2", input, {
+        origin: "https://other.example",
+      })
+    ).response.status,
+    403,
+  );
+  const draft = await owner.request("workbook/2", {
+    ...input,
+    studentId: "student-2",
+  });
+  assert.equal(draft.response.status, 200);
+  assert.equal(draft.data.result.studentId, "student-1");
+  const draftPdf = await owner.request("workbook/2/pdf", undefined, {
+    raw: true,
+  });
+  assert.equal(draftPdf.response.status, 200);
+  assert.equal(
+    Buffer.from(await draftPdf.response.arrayBuffer())
+      .subarray(0, 4)
+      .toString(),
+    "%PDF",
+  );
+  assert.equal(
+    (await owner.request("workbook/2")).data.result.work,
+    input.work,
+  );
+  assert.equal((await other.request("workbook/2")).data.result, null);
+  assert.equal(
+    (await owner.request("workbook/2/analyze", { work: input.work, life: " " }))
+      .response.status,
+    400,
+  );
+  const ai = await owner.request("workbook/2/analyze", {
+    work: input.work,
+    life: "Мои близкие важны.",
+  });
+  assert.equal(ai.response.status, 503);
+  assert.ok(ai.data.error);
+  input.work = "работа ".repeat(300).trim();
+  input.life = "Мои близкие важны.";
+  input.alignment = {
+    complement: "Забота о людях.",
+    conflict: "Баланс времени.",
+    direction: "Жизнь задаёт приоритеты.",
+  };
+  input.status = "completed";
+  assert.equal((await owner.request("workbook/2", input)).response.status, 200);
+  const restored = (await owner.request("workbook/2")).data.result;
+  assert.deepEqual(restored.alignment, input.alignment);
+  assert.equal(restored.status, "completed");
+  assert.equal(restored.work, input.work);
+  const compassPdf = await owner.request("workbook/2/pdf", undefined, {
+    raw: true,
+  });
+  assert.equal(compassPdf.response.status, 200);
+  assert.equal(
+    compassPdf.response.headers.get("content-type"),
+    "application/pdf",
+  );
+  assert.equal(compassPdf.response.headers.get("cache-control"), "no-store");
+  assert.equal(
+    Buffer.from(await compassPdf.response.arrayBuffer())
+      .subarray(0, 4)
+      .toString(),
+    "%PDF",
+  );
+  assert.equal((await other.request("workbook/2/pdf")).response.status, 404);
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(
+      "Жизнь задаёт приоритеты",
+    ),
+    false,
+  );
+  assert.equal(
+    (await owner.request("workbook/1")).data.result.answers.health.score,
+    50,
+  );
+});
+
+test("time diary enforces ownership, seven-day reflection, revisions and the 21-day limit", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  const answers = {
+    actions: "Прогулки придают сил",
+    environment: "",
+    interactions: "",
+    objects: "",
+    people: "",
+  };
+  const makeDay = (index: number) => ({
+    date: `2026-09-${String(index).padStart(2, "0")}`,
+    activities: [
+      {
+        id: "activity",
+        activity: "Прогулка в парке",
+        engagement: 0,
+        energy: -5,
+        flow: false,
+      },
+    ],
+  });
+  assert.equal((await anonymous.request("workbook/3")).response.status, 401);
+  assert.equal((await admin.request("workbook/3")).response.status, 403);
+  assert.equal(
+    (await admin.request("workbook/3/day", { day: makeDay(1), mode: "create" }))
+      .response.status,
+    403,
+  );
+  assert.equal(
+    (await admin.request("workbook/3/analyze", {})).response.status,
+    403,
+  );
+  assert.deepEqual((await owner.request("workbook/3")).data.result.days, []);
+  assert.equal(
+    (await owner.request("workbook/3/analyze", {})).response.status,
+    400,
+  );
+  assert.equal(
+    (
+      await owner.request("workbook/3/day", {
+        day: { ...makeDay(1), activities: [] },
+        mode: "create",
+      })
+    ).response.status,
+    400,
+  );
+  for (let i = 1; i <= 6; i++) {
+    const saved = await owner.request("workbook/3/day", {
+      day: makeDay(i),
+      mode: "create",
+      studentId: "student-2",
+    });
+    assert.equal(saved.response.status, 200);
+    assert.equal(saved.data.result.studentId, "student-1");
+    assert.equal(saved.data.result.days.length, i);
+  }
+  assert.equal(
+    (await owner.request("workbook/3/reflection", { answers, revision: 6 }))
+      .response.status,
+    400,
+  );
+  const seventh = await owner.request("workbook/3/day", {
+    day: makeDay(7),
+    mode: "create",
+  });
+  assert.equal(seventh.data.result.revision, 7);
+  assert.equal(
+    (await owner.request("workbook/3/reflection", { answers, revision: 6 }))
+      .response.status,
+    409,
+  );
+  assert.equal(
+    (await owner.request("workbook/3/reflection", { answers, revision: 7 }))
+      .response.status,
+    200,
+  );
+  assert.equal(
+    (await owner.request("workbook/3/analyze", {})).response.status,
+    503,
+  );
+  assert.equal(
+    (await owner.request("workbook/3/day", { day: makeDay(7), mode: "create" }))
+      .response.status,
+    409,
+  );
+  assert.equal(
+    (await owner.request("workbook/3/day", { day: makeDay(8), mode: "update" }))
+      .response.status,
+    404,
+  );
+  assert.deepEqual((await other.request("workbook/3")).data.result.days, []);
+  assert.equal(
+    (await other.request("workbook/3/day/delete", { date: makeDay(7).date }))
+      .response.status,
+    404,
+  );
+  assert.equal(
+    (await other.request("workbook/3/reflection", { answers, revision: 7 }))
+      .response.status,
+    400,
+  );
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(
+      "Прогулка в парке",
+    ),
+    false,
+  );
+  for (let i = 8; i <= 21; i++)
+    assert.equal(
+      (
+        await owner.request("workbook/3/day", {
+          day: makeDay(i),
+          mode: "create",
+        })
+      ).response.status,
+      200,
+    );
+  assert.equal(
+    (
+      await owner.request("workbook/3/day", {
+        day: makeDay(22),
+        mode: "create",
+      })
+    ).response.status,
+    400,
+  );
+  const updated = await owner.request("workbook/3/day", {
+    day: {
+      ...makeDay(21),
+      activities: [
+        { ...makeDay(21).activities[0], engagement: 10, energy: 5, flow: true },
+      ],
+    },
+    mode: "update",
+  });
+  assert.equal(updated.data.result.days.length, 21);
+  assert.equal(updated.data.result.days[0].activities[0].flow, true);
+  assert.equal(updated.data.result.reflection.basedOnRevision, 7);
+  assert.equal(updated.data.result.revision, 22);
+  for (let i = 21; i > 6; i--)
+    assert.equal(
+      (await owner.request("workbook/3/day/delete", { date: makeDay(i).date }))
+        .response.status,
+      200,
+    );
+  const restored = (await owner.request("workbook/3")).data.result;
+  assert.equal(restored.days.length, 6);
+  assert.deepEqual(restored.reflection.answers, answers);
+  assert.equal(
+    (
+      await owner.request("workbook/3/reflection", {
+        answers,
+        revision: restored.revision,
+      })
+    ).response.status,
+    400,
+  );
+  assert.equal(
+    (await owner.request("workbook/3/analyze", {})).response.status,
+    400,
+  );
+});
+
+test("mind map privately persists drafts, ideas, revisions and exports saved results", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  const map = emptyMindMap();
+  map.core = "Рисование в мастерской";
+  assert.equal((await anonymous.request("workbook/4")).response.status, 401);
+  assert.equal((await admin.request("workbook/4")).response.status, 403);
+  assert.equal(
+    (await admin.request("workbook/4", { map, revision: 0 })).response.status,
+    403,
+  );
+  assert.equal((await owner.request("workbook/4/pdf")).response.status, 404);
+  const saved = await owner.request("workbook/4", {
+    map,
+    revision: 0,
+    studentId: "student-2",
+  });
+  assert.equal(saved.response.status, 200);
+  assert.equal(saved.data.result.studentId, "student-1");
+  assert.equal(
+    (await owner.request("workbook/4", { map, revision: 0 })).response.status,
+    409,
+  );
+  assert.equal((await other.request("workbook/4")).data.result, null);
+  assert.deepEqual((await other.request("workbook/4")).data.suggestions, []);
+  assert.ok((await owner.request("workbook/4")).data.suggestions.length > 0);
+  const invalid = {
+    ...map,
+    selected: [map.nodes.find((node) => node.level === 4)!.id],
+  };
+  assert.equal(
+    (await owner.request("workbook/4", { map: invalid, revision: 1 })).response
+      .status,
+    400,
+  );
+  map.nodes.forEach((node, index) => {
+    node.word = `Слово ${index}`;
+  });
+  map.selected = randomOuterWords(map.nodes);
+  map.ideas = [
+    {
+      id: "idea",
+      core: map.core,
+      words: map.selected.map(
+        (id) => map.nodes.find((node) => node.id === id)!.word,
+      ) as [string, string, string],
+      title: "Идея ученика",
+      description: "Личное описание идеи",
+    },
+  ];
+  assert.equal(
+    (await owner.request("workbook/4", { map, revision: 1 })).response.status,
+    200,
+  );
+  assert.deepEqual(
+    (await owner.request("workbook/4")).data.result.ideas,
+    map.ideas,
+  );
+  assert.equal(
+    (await other.request("workbook/4/analyze", { ideaId: "idea" })).response
+      .status,
+    404,
+  );
+  assert.equal(
+    (await owner.request("workbook/4/analyze", { ideaId: "idea" })).response
+      .status,
+    503,
+  );
+  assert.equal(
+    (await admin.request("workbook/4/analyze", { ideaId: "idea" })).response
+      .status,
+    403,
+  );
+  assert.equal((await other.request("workbook/4/pdf")).response.status, 404);
+  assert.equal((await admin.request("workbook/4/pdf")).response.status, 403);
+  const pdf = await owner.request("workbook/4/pdf", undefined, { raw: true });
+  assert.equal(pdf.response.status, 200);
+  assert.equal(pdf.response.headers.get("content-type"), "application/pdf");
+  assert.equal(
+    Buffer.from(await pdf.response.arrayBuffer())
+      .subarray(0, 4)
+      .toString(),
+    "%PDF",
+  );
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(
+      "Личное описание идеи",
+    ),
+    false,
+  );
+});
+
+test("odyssey saves independent plans and drawings privately, checks completion and revisions", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  const plan = emptyOdyssey();
+  assert.equal((await anonymous.request("workbook/5")).response.status, 401);
+  assert.equal(
+    (await anonymous.request("workbook/5", { plan, revision: 0 })).response
+      .status,
+    401,
+  );
+  assert.equal((await admin.request("workbook/5")).response.status, 403);
+  assert.equal(
+    (await admin.request("workbook/5", { plan, revision: 0 })).response.status,
+    403,
+  );
+  const initial = await owner.request("workbook/5");
+  assert.equal(initial.data.result, null);
+  const ownCompass = (await owner.request("workbook/2")).data.result;
+  assert.equal(initial.data.compass.work, ownCompass.work);
+  assert.equal((await other.request("workbook/5")).data.compass, null);
+  plan.scenarios[0].events = [
+    {
+      ...newOdysseyEvent(1),
+      title: "Личный план Одиссеи",
+      category: "projects",
+      assumption: true,
+      drawing: [
+        {
+          color: "#34513a",
+          width: 4,
+          points: [
+            [50, 50],
+            [100, 200],
+          ],
+        },
+      ],
+    },
+  ];
+  plan.scenarios[1].events = [
+    { ...newOdysseyEvent(3), title: "Другой путь", category: "learning" },
+  ];
+  const saved = await owner.request("workbook/5", {
+    plan,
+    revision: 0,
+    studentId: "student-2",
+  });
+  assert.equal(saved.response.status, 200);
+  assert.equal(saved.data.result.studentId, "student-1");
+  assert.equal(saved.data.result.revision, 1);
+  assert.equal(
+    (await owner.request("workbook/5", { plan, revision: 0 })).response.status,
+    409,
+  );
+  assert.deepEqual(
+    (await owner.request("workbook/5")).data.result.scenarios,
+    plan.scenarios,
+  );
+  assert.equal((await other.request("workbook/5")).data.result, null);
+  plan.scenarios[0].status = "completed";
+  assert.equal(
+    (await owner.request("workbook/5", { plan, revision: 1 })).response.status,
+    400,
+  );
+  plan.scenarios[0].title = "Учусь создавать проекты помогаю людям путешествую";
+  plan.scenarios[0].questions = ["Что хочу проверить?", "Кто сможет помочь?"];
+  Object.values(plan.scenarios[0].ratings).forEach((rating) => {
+    rating.score = 0;
+    rating.why = "Моя причина";
+  });
+  const completed = await owner.request("workbook/5", { plan, revision: 1 });
+  assert.equal(completed.response.status, 200);
+  assert.equal(completed.data.result.scenarios[0].status, "completed");
+  assert.equal(completed.data.result.scenarios[1].status, "draft");
+  plan.scenarios[0].events[0].year = 5;
+  plan.scenarios[0].status = "draft";
+  assert.equal(
+    (await owner.request("workbook/5", { plan, revision: 2 })).response.status,
+    200,
+  );
+  const restored = (await owner.request("workbook/5")).data.result;
+  assert.equal(restored.scenarios[0].events[0].year, 5);
+  assert.deepEqual(
+    restored.scenarios[0].events[0].drawing,
+    plan.scenarios[0].events[0].drawing,
+  );
+  assert.equal(restored.scenarios[1].events[0].year, 3);
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(
+      "Личный план Одиссеи",
+    ),
+    false,
+  );
+});
+
+test("failure journal is private, validates category answers and revises individual entries safely", async () => {
+  const owner = new Client(),
+    other = new Client(),
+    admin = new Client(),
+    anonymous = new Client();
+  const id = randomUUID();
+  const entry = {
+    date: "2026-09-24",
+    event: "Личный разбор неудачного выступления",
+    expected: "Убедить слушателей",
+    actual: "Остались вопросы",
+    category: "slip",
+    responses: { slip: "Репетиция с коллегой", difficulty: "", growth: "" },
+    conclusion: "Добавлю время для вопросов",
+    nextStep: "",
+  };
+  const input = { id, revision: 0, entry };
+  assert.equal((await anonymous.request("workbook/6")).response.status, 401);
+  assert.equal(
+    (await anonymous.request("workbook/6", input)).response.status,
+    401,
+  );
+  await owner.request("auth/demo", { role: "student" });
+  await admin.request("auth/demo", { role: "teacher" });
+  await other.request("auth/login", {
+    email: "misha@meta-education.demo",
+    password: "MetaEducation2026!",
+  });
+  assert.equal((await admin.request("workbook/6")).response.status, 403);
+  assert.equal((await admin.request("workbook/6", input)).response.status, 403);
+  assert.deepEqual((await owner.request("workbook/6")).data.entries, []);
+  for (const patch of [
+    { expected: " " },
+    { actual: "" },
+    { conclusion: "" },
+    { category: "unknown" },
+    { date: "2026-02-30" },
+    { category: "growth" },
+  ]) {
+    assert.equal(
+      (
+        await owner.request("workbook/6", {
+          ...input,
+          entry: { ...entry, ...patch },
+        })
+      ).response.status,
+      400,
+    );
+  }
+  const saved = await owner.request("workbook/6", {
+    ...input,
+    entry: { ...entry, studentId: "student-2" },
+  });
+  assert.equal(saved.response.status, 200);
+  assert.equal(saved.data.result.studentId, "student-1");
+  assert.equal(saved.data.result.revision, 1);
+  assert.ok(saved.data.result.createdAt);
+  assert.deepEqual((await other.request("workbook/6")).data.entries, []);
+  assert.equal(
+    (await other.request("workbook/6", { ...input, revision: 1 })).response
+      .status,
+    404,
+  );
+  assert.equal((await owner.request("workbook/6", input)).response.status, 409);
+  const changed = {
+    ...entry,
+    category: "growth",
+    responses: { ...entry.responses, growth: "Проверю понятность примеров" },
+    nextStep: "Покажу черновик коллеге",
+  };
+  const updated = await owner.request("workbook/6", {
+    id,
+    revision: 1,
+    entry: changed,
+  });
+  assert.equal(updated.response.status, 200);
+  assert.equal(updated.data.result.createdAt, saved.data.result.createdAt);
+  assert.equal(updated.data.result.revision, 2);
+  assert.deepEqual(updated.data.result.responses, changed.responses);
+  const secondId = randomUUID();
+  assert.equal(
+    (
+      await owner.request("workbook/6", {
+        id: secondId,
+        revision: 0,
+        entry: {
+          ...entry,
+          date: "2026-09-23",
+          category: "difficulty",
+          responses: { ...entry.responses, difficulty: "Тихое помещение" },
+        },
+      })
+    ).response.status,
+    200,
+  );
+  const history = (await owner.request("workbook/6")).data.entries;
+  assert.equal(history.length, 2);
+  assert.equal(history[0].id, id);
+  assert.equal(history[0].category, "growth");
+  assert.equal(history[1].id, secondId);
+  assert.equal(history[1].revision, 1);
+  assert.equal(
+    JSON.stringify((await admin.request("data")).data).includes(entry.event),
+    false,
+  );
+  assert.equal(
+    JSON.stringify((await other.request("data")).data).includes(entry.event),
+    false,
+  );
+});
+
 before(async () => {
   const env = {
     ...process.env,
@@ -70,6 +1122,8 @@ before(async () => {
     S3_BUCKET: "",
     S3_ACCESS_KEY_ID: "",
     S3_SECRET_ACCESS_KEY: "",
+    DEEPSEEK_API_KEY: "",
+    DEEPSEEK_MODEL: "deepseek-flash",
   };
   if (process.env.TEST_DATABASE_URL) {
     pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
@@ -180,7 +1234,10 @@ test("complete workflow: invitation, assignment, private file, submission, gradi
   await t.test(
     "invitation can be redeemed only once and email is enforced",
     async () => {
-      const invite = await teacher.request("invites", {
+      await manager.request("auth/demo", { role: "manager" });
+      const invite = await manager.request("invites", {
+        role: "student",
+        workspaceIds: ["math", "design"],
         email: "acceptance@meta-education.test",
         groupId: "group-1",
       });
@@ -233,7 +1290,8 @@ test("complete workflow: invitation, assignment, private file, submission, gradi
       assert.equal(mine.data.assignments[0].id, assignment.id);
       assert.ok(
         mine.data.users.every(
-          (u: AppData["user"]) => u.id === studentId || u.role === "teacher",
+          (u: AppData["user"]) =>
+            u.id === studentId || u.role === "teacher" || u.role === "admin",
         ),
       );
       assert.equal(mine.data.groups[0].studentIds.length, 1);
@@ -441,7 +1499,9 @@ test("complete workflow: invitation, assignment, private file, submission, gradi
           400,
         );
       }
-      const invite = await teacher.request("invites", {
+      const invite = await manager.request("invites", {
+        role: "student",
+        workspaceIds: ["math", "design"],
         email: "individual@meta-education.test",
       });
       assert.equal(invite.response.status, 201);
